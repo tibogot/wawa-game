@@ -1,9 +1,22 @@
 import React, { useEffect, useRef } from "react";
-import { useControls } from "leva";
 import { useThree } from "@react-three/fiber";
 import * as THREE from "three";
 
-export const HeightFog: React.FC = () => {
+interface HeightFogProps {
+  enabled?: boolean;
+  fogColor?: string;
+  fogHeight?: number;
+  fogNear?: number;
+  fogFar?: number;
+}
+
+export const HeightFog: React.FC<HeightFogProps> = ({
+  enabled = true,
+  fogColor = "#cccccc",
+  fogHeight = 50.0,
+  fogNear = 1,
+  fogFar = 2300,
+}) => {
   const { scene } = useThree();
   const shadersModified = useRef(false);
   const originalShaders = useRef<{
@@ -12,35 +25,6 @@ export const HeightFog: React.FC = () => {
     fog_pars_fragment?: string;
     fog_fragment?: string;
   }>({});
-
-  const { enabled, fogColor, fogHeight, fogNear, fogFar } = useControls(
-    "Height Fog",
-    {
-      enabled: { value: true, label: "Enabled" },
-      fogColor: { value: "#cccccc", label: "Fog Color" },
-      fogHeight: {
-        value: 50.0,
-        label: "Fog Height",
-        min: 0,
-        max: 200,
-        step: 5,
-      },
-      fogNear: {
-        value: 1,
-        label: "Fog Near",
-        min: 0.1,
-        max: 50,
-        step: 1,
-      },
-      fogFar: {
-        value: 2300,
-        label: "Fog Far",
-        min: 10,
-        max: 5000,
-        step: 10,
-      },
-    }
-  );
 
   // Modify shader chunks once on mount
   useEffect(() => {

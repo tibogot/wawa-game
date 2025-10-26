@@ -1,6 +1,7 @@
 import { KeyboardControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import { Experience } from "./components/Experience";
+import { GlobalWindProvider } from "./components/GlobalWindProvider";
 import { Perf } from "r3f-perf";
 
 const keyboardMap = [
@@ -26,7 +27,9 @@ function App() {
         }}
       >
         <Perf position="top-left" />
-        <Experience />
+        <GlobalWindProvider>
+          <Experience />
+        </GlobalWindProvider>
       </Canvas>
     </KeyboardControls>
   );
