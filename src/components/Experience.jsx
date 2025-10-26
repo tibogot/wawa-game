@@ -2,18 +2,20 @@ import {
   Environment,
   OrthographicCamera,
   OrbitControls,
-  PerspectiveCamera,
 } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
 import { useControls, folder } from "leva";
 import { useRef, useState, useEffect } from "react";
 import { GodotCharacterHybrid } from "./GodotCharacterHybrid";
+import * as THREE from "three";
 import { Map1 } from "./Map1";
 import { Map2 } from "./Map2";
 import { Map3 } from "./Map3";
 import { Map4 } from "./Map4";
+import { Map5 } from "./Map5";
 import { DeerController } from "./DeerController";
 import { DeerHerd } from "./DeerHerd";
+import { useLightsControls } from "./useLightsControls";
 import {
   getSafeSpawnPosition,
   getTerrainHeightFromTexture,
@@ -36,6 +38,10 @@ const maps = {
     scale: 1,
     position: [0, 0, 0],
   },
+  map5: {
+    scale: 1,
+    position: [0, 0, 0],
+  },
 };
 
 export const Experience = () => {
@@ -45,6 +51,10 @@ export const Experience = () => {
     0, 10, 0,
   ]);
   const [deerSpawnPosition, setDeerSpawnPosition] = useState([5, 1, 5]);
+
+  // Track character position and velocity for dynamic effects
+  const characterPositionVector = useRef(new THREE.Vector3());
+  const characterVelocity = useRef(new THREE.Vector3());
   const { map, cameraMode } = useControls("Map", {
     map: {
       value: "map1",
@@ -68,6 +78,7 @@ export const Experience = () => {
     },
   });
 
+  // Get lights controls from separate hook
   const {
     envType,
     envPreset,
@@ -91,178 +102,7 @@ export const Experience = () => {
     shadowCameraNear,
     shadowCameraFar,
     showTestSphere,
-  } = useControls("💡 LIGHTS", {
-    environment: folder(
-      {
-        envType: {
-          value: "custom",
-          options: ["preset", "custom"],
-          label: "Type",
-        },
-        envPreset: {
-          value: "sunset",
-          options: [
-            "apartment",
-            "city",
-            "dawn",
-            "forest",
-            "lobby",
-            "night",
-            "park",
-            "studio",
-            "sunset",
-            "warehouse",
-          ],
-          label: "Preset",
-        },
-        envCustomUrl: {
-          value:
-            "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/rustig_koppie_puresky_4k.hdr",
-          label: "HDRI URL",
-        },
-        envIntensity: {
-          value: 1,
-          min: 0,
-          max: 5,
-          step: 0.1,
-          label: "Intensity",
-        },
-        envBackground: {
-          value: true,
-          label: "Show as Background",
-        },
-        envBackgroundBlurriness: {
-          value: 0,
-          min: 0,
-          max: 1,
-          step: 0.01,
-          label: "Background Blur",
-        },
-        envBackgroundIntensity: {
-          value: 0.7,
-          min: 0,
-          max: 5,
-          step: 0.1,
-          label: "Background Intensity",
-        },
-      },
-      { collapsed: true }
-    ),
-    ambient: folder(
-      {
-        ambientIntensity: {
-          value: 0.4,
-          min: 0,
-          max: 2,
-          step: 0.1,
-          label: "Intensity",
-        },
-      },
-      { collapsed: true }
-    ),
-    sun: folder(
-      {
-        directionalIntensity: {
-          value: 0.65,
-          min: 0,
-          max: 3,
-          step: 0.05,
-          label: "Intensity",
-        },
-        directionalColor: {
-          value: "#ffffff",
-          label: "Color",
-        },
-        directionalPosition: {
-          value: [-15, 10, 15],
-          label: "Position [X, Y, Z]",
-        },
-        shadowMapSize: {
-          value: 2048,
-          options: [512, 1024, 2048, 4096, 8192],
-          label: "Shadow Map Size",
-        },
-        shadowBias: {
-          value: -0.00005,
-          min: -0.001,
-          max: 0.001,
-          step: 0.00001,
-          label: "Shadow Bias",
-        },
-        shadowNormalBias: {
-          value: 0.0,
-          min: 0,
-          max: 0.1,
-          step: 0.001,
-          label: "Normal Bias",
-        },
-        shadowRadius: {
-          value: 4,
-          min: 0,
-          max: 20,
-          step: 1,
-          label: "Shadow Blur Radius",
-        },
-      },
-      { collapsed: true }
-    ),
-    shadows: folder(
-      {
-        shadowCameraLeft: {
-          value: -22,
-          min: -100,
-          max: 100,
-          step: 1,
-          label: "Left Bound",
-        },
-        shadowCameraRight: {
-          value: 15,
-          min: -100,
-          max: 100,
-          step: 1,
-          label: "Right Bound",
-        },
-        shadowCameraTop: {
-          value: 10,
-          min: -100,
-          max: 100,
-          step: 1,
-          label: "Top Bound",
-        },
-        shadowCameraBottom: {
-          value: -20,
-          min: -100,
-          max: 100,
-          step: 1,
-          label: "Bottom Bound",
-        },
-        shadowCameraNear: {
-          value: 0.1,
-          min: 0.1,
-          max: 1000,
-          step: 1,
-          label: "Near Plane",
-        },
-        shadowCameraFar: {
-          value: 1000,
-          min: 1,
-          max: 5000,
-          step: 10,
-          label: "Far Plane",
-        },
-      },
-      { collapsed: true }
-    ),
-    debug: folder(
-      {
-        showTestSphere: {
-          value: true,
-          label: "Show Test Sphere",
-        },
-      },
-      { collapsed: true }
-    ),
-  });
+  } = useLightsControls();
 
   // Calculate smart spawn positions when map changes
   useEffect(() => {
@@ -284,6 +124,24 @@ export const Experience = () => {
 
       setCharacterSpawnPosition(characterPos);
       setDeerSpawnPosition(deerPos);
+    } else if (map === "map5") {
+      // Use texture-based calculation for Map5 (ZeldaTerrain2)
+      // Map5 parameters: worldSize=1000, displacementScale=50, peak at Y=0
+      const characterHeight = getTerrainHeightFromTexture(
+        0,
+        0,
+        null,
+        1000,
+        50,
+        0
+      );
+      const deerHeight = getTerrainHeightFromTexture(5, 5, null, 1000, 50, 0);
+
+      const characterPos = [0, characterHeight + 2, 0];
+      const deerPos = [5, 1, 5]; // Fixed at ground level with slight clearance
+
+      setCharacterSpawnPosition(characterPos);
+      setDeerSpawnPosition(deerPos);
     } else {
       // For other maps, use default positions
       setCharacterSpawnPosition([0, 2, 0]);
@@ -293,25 +151,14 @@ export const Experience = () => {
 
   return (
     <>
-      {cameraMode === "orbit" ? (
-        <>
-          <PerspectiveCamera
-            makeDefault
-            position={[0, 50, 100]}
-            fov={75}
-            near={0.1}
-            far={5000}
-          />
-          <OrbitControls
-            enablePan={true}
-            enableZoom={true}
-            enableRotate={true}
-            minDistance={10}
-            maxDistance={2000}
-          />
-        </>
-      ) : (
-        <PerspectiveCamera makeDefault fov={75} near={0.1} far={5000} />
+      {cameraMode === "orbit" && (
+        <OrbitControls
+          enablePan={true}
+          enableZoom={true}
+          enableRotate={true}
+          minDistance={10}
+          maxDistance={2000}
+        />
       )}
       {envType === "preset" ? (
         <Environment
@@ -355,7 +202,12 @@ export const Experience = () => {
       </directionalLight>
       <Physics key={map} debug={showRapierDebug}>
         {map === "map1" ? (
-          <Map1 scale={maps[map].scale} position={maps[map].position} />
+          <Map1
+            scale={maps[map].scale}
+            position={maps[map].position}
+            characterPosition={characterPositionVector.current}
+            characterVelocity={characterVelocity.current}
+          />
         ) : map === "map2" ? (
           <Map2 scale={maps[map].scale} position={maps[map].position} />
         ) : map === "map3" ? (
@@ -363,13 +215,27 @@ export const Experience = () => {
             ref={terrainMeshRef}
             scale={maps[map].scale}
             position={maps[map].position}
+            characterPosition={characterPositionVector.current}
+            characterVelocity={characterVelocity.current}
           />
-        ) : (
+        ) : map === "map4" ? (
           <Map4 scale={maps[map].scale} position={maps[map].position} />
+        ) : (
+          <Map5
+            ref={terrainMeshRef}
+            scale={maps[map].scale}
+            position={maps[map].position}
+          />
         )}
         <GodotCharacterHybrid
           cameraMode={cameraMode}
           position={characterSpawnPosition}
+          onPositionChange={(pos) => {
+            characterPositionVector.current.set(pos[0], pos[1], pos[2]);
+          }}
+          onVelocityChange={(vel) => {
+            characterVelocity.current.set(vel[0], vel[1], vel[2]);
+          }}
         />
         <DeerController
           position={deerSpawnPosition}

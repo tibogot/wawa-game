@@ -1,5 +1,6 @@
 import React, { useRef, useMemo, useEffect, useState } from "react";
 import { useFrame } from "@react-three/fiber";
+import { useControls, folder } from "leva";
 import * as THREE from "three";
 import { useGlobalWind } from "./GlobalWindProvider";
 
@@ -16,16 +17,80 @@ interface ParticlesFogProps {
 }
 
 export const ParticlesFog: React.FC<ParticlesFogProps> = ({
-  density = 500,
-  areaSize = 100,
-  height = 30,
-  windInfluence = 1.0,
-  opacity = 0.3,
-  particleSize = 0.5,
-  enableFog = true,
-  useTexture = true,
-  volumetricLayers = 3,
+  density: defaultDensity = 500,
+  areaSize: defaultAreaSize = 100,
+  height: defaultHeight = 30,
+  windInfluence: defaultWindInfluence = 1.0,
+  opacity: defaultOpacity = 0.3,
+  particleSize: defaultParticleSize = 0.5,
+  enableFog: defaultEnableFog = false,
+  useTexture: defaultUseTexture = true,
+  volumetricLayers: defaultVolumetricLayers = 3,
 }) => {
+  // Internal controls
+  const {
+    enabled,
+    density,
+    areaSize,
+    height,
+    windInfluence,
+    opacity,
+    particleSize,
+    useTexture,
+    volumetricLayers,
+  } = useControls("🌫️ Particles Fog", {
+    enabled: { value: defaultEnableFog, label: "Enable Fog" },
+    density: {
+      value: defaultDensity,
+      label: "Density",
+      min: 100,
+      max: 2000,
+      step: 50,
+    },
+    areaSize: {
+      value: defaultAreaSize,
+      label: "Area Size",
+      min: 20,
+      max: 300,
+      step: 10,
+    },
+    height: {
+      value: defaultHeight,
+      label: "Height",
+      min: 5,
+      max: 100,
+      step: 5,
+    },
+    windInfluence: {
+      value: defaultWindInfluence,
+      label: "Wind Influence",
+      min: 0,
+      max: 3,
+      step: 0.1,
+    },
+    opacity: {
+      value: defaultOpacity,
+      label: "Opacity",
+      min: 0.1,
+      max: 1.0,
+      step: 0.05,
+    },
+    particleSize: {
+      value: defaultParticleSize,
+      label: "Particle Size",
+      min: 0.1,
+      max: 2.0,
+      step: 0.1,
+    },
+    useTexture: { value: defaultUseTexture, label: "Use Texture" },
+    volumetricLayers: {
+      value: defaultVolumetricLayers,
+      label: "Volumetric Layers",
+      min: 1,
+      max: 10,
+      step: 1,
+    },
+  });
   const instancedMeshRefs = useRef<(THREE.InstancedMesh | null)[]>([]);
   const { windUniforms } = useGlobalWind();
 
@@ -73,7 +138,7 @@ export const ParticlesFog: React.FC<ParticlesFogProps> = ({
 
   // Create fog particle geometries for different layers (different sizes)
   const fogGeometries = useMemo(() => {
-    const geometries = [];
+    const geometries: THREE.SphereGeometry[] = [];
     for (let i = 0; i < volumetricLayers; i++) {
       const layerSize = particleSize * (0.3 + (i / volumetricLayers) * 0.7); // 0.3x to 1.0x size
       const geometry = new THREE.SphereGeometry(layerSize, 8, 6);
@@ -84,7 +149,7 @@ export const ParticlesFog: React.FC<ParticlesFogProps> = ({
 
   // Create fog materials for different layers (different opacities)
   const fogMaterials = useMemo(() => {
-    const materials = [];
+    const materials: THREE.MeshLambertMaterial[] = [];
     for (let i = 0; i < volumetricLayers; i++) {
       const layerOpacity = opacity * (0.2 + (i / volumetricLayers) * 0.8); // 0.2x to 1.0x opacity
 
@@ -93,7 +158,7 @@ export const ParticlesFog: React.FC<ParticlesFogProps> = ({
       canvas.width = 256;
       canvas.height = 256;
       const ctx = canvas.getContext("2d");
-      let fallbackTexture;
+      let fallbackTexture: THREE.Texture;
       if (ctx) {
         // Create a radial gradient for fog-like appearance
         const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
@@ -142,12 +207,22 @@ export const ParticlesFog: React.FC<ParticlesFogProps> = ({
   }, [fogMaterials, fogTexture]);
 
   // Initialize fog particle positions and properties for each layer
+  interface FogData {
+    positions: Float32Array;
+    rotations: Float32Array;
+    velocities: Float32Array;
+    opacities: Float32Array;
+    sizes: Float32Array;
+    ages: Float32Array;
+    maxAge: number;
+  }
+
   const fogDataLayers = useMemo(() => {
-    const layersData = [];
+    const layersData: FogData[] = [];
     const particlesPerLayer = Math.floor(density / volumetricLayers);
 
     for (let layer = 0; layer < volumetricLayers; layer++) {
-      const data = {
+      const data: FogData = {
         positions: new Float32Array(particlesPerLayer * 3),
         rotations: new Float32Array(particlesPerLayer * 3),
         velocities: new Float32Array(particlesPerLayer * 3),
@@ -195,7 +270,7 @@ export const ParticlesFog: React.FC<ParticlesFogProps> = ({
 
   // Update fog particle positions and properties for each layer
   useFrame(() => {
-    if (!enableFog) return;
+    if (!enabled) return;
 
     const matrix = new THREE.Matrix4();
     const position = new THREE.Vector3();
@@ -312,7 +387,7 @@ export const ParticlesFog: React.FC<ParticlesFogProps> = ({
     }
   });
 
-  if (!enableFog) return null;
+  if (!enabled) return null;
 
   const particlesPerLayer = Math.floor(density / volumetricLayers);
 

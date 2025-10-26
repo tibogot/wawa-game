@@ -1,5 +1,6 @@
 import React, { useRef, useMemo, useEffect, useState } from "react";
 import { useFrame } from "@react-three/fiber";
+import { useControls } from "leva";
 import * as THREE from "three";
 import { useGlobalWind } from "./GlobalWindProvider";
 
@@ -15,15 +16,71 @@ interface FloatingLeavesProps {
 }
 
 export const FloatingLeaves: React.FC<FloatingLeavesProps> = ({
-  count = 100,
-  areaSize = 50,
-  spawnHeight = 20,
-  leafSize = 0.2,
-  windInfluence = 1.0,
-  gravity = 0.002,
-  enableLeaves = true,
-  useTexture = true,
+  count: defaultCount = 100,
+  areaSize: defaultAreaSize = 50,
+  spawnHeight: defaultSpawnHeight = 20,
+  leafSize: defaultLeafSize = 0.2,
+  windInfluence: defaultWindInfluence = 1.0,
+  gravity: defaultGravity = 0.002,
+  enableLeaves: defaultEnableLeaves = false,
+  useTexture: defaultUseTexture = true,
 }) => {
+  // Internal controls
+  const {
+    enabled,
+    count,
+    areaSize,
+    spawnHeight,
+    leafSize,
+    windInfluence,
+    gravity,
+    useTexture,
+  } = useControls("🍂 Floating Leaves", {
+    enabled: { value: defaultEnableLeaves, label: "Enable Leaves" },
+    count: {
+      value: defaultCount,
+      label: "Count",
+      min: 10,
+      max: 500,
+      step: 10,
+    },
+    areaSize: {
+      value: defaultAreaSize,
+      label: "Area Size",
+      min: 10,
+      max: 200,
+      step: 10,
+    },
+    spawnHeight: {
+      value: defaultSpawnHeight,
+      label: "Spawn Height",
+      min: 5,
+      max: 100,
+      step: 5,
+    },
+    leafSize: {
+      value: defaultLeafSize,
+      label: "Leaf Size",
+      min: 0.05,
+      max: 1.0,
+      step: 0.05,
+    },
+    windInfluence: {
+      value: defaultWindInfluence,
+      label: "Wind Influence",
+      min: 0,
+      max: 3,
+      step: 0.1,
+    },
+    gravity: {
+      value: defaultGravity,
+      label: "Gravity",
+      min: 0,
+      max: 0.01,
+      step: 0.0005,
+    },
+    useTexture: { value: defaultUseTexture, label: "Use Texture" },
+  });
   const instancedMeshRef = useRef<THREE.InstancedMesh>(null);
   const { windUniforms } = useGlobalWind();
 
@@ -117,8 +174,16 @@ export const FloatingLeaves: React.FC<FloatingLeavesProps> = ({
   }, [leafMaterial, leafTexture]);
 
   // Initialize leaf positions and properties
+  interface LeafData {
+    positions: Float32Array;
+    rotations: Float32Array;
+    velocities: Float32Array;
+    ages: Float32Array;
+    maxAge: number;
+  }
+
   const leafData = useMemo(() => {
-    const data = {
+    const data: LeafData = {
       positions: new Float32Array(count * 3),
       rotations: new Float32Array(count * 3),
       velocities: new Float32Array(count * 3),
@@ -154,7 +219,7 @@ export const FloatingLeaves: React.FC<FloatingLeavesProps> = ({
 
   // Update leaf positions and rotations
   useFrame(() => {
-    if (!instancedMeshRef.current || !enableLeaves) return;
+    if (!instancedMeshRef.current || !enabled) return;
 
     const matrix = new THREE.Matrix4();
     const position = new THREE.Vector3();
@@ -245,7 +310,7 @@ export const FloatingLeaves: React.FC<FloatingLeavesProps> = ({
     instancedMeshRef.current.instanceMatrix.needsUpdate = true;
   });
 
-  if (!enableLeaves) return null;
+  if (!enabled) return null;
 
   return (
     <instancedMesh

@@ -78,10 +78,10 @@ export const GodotCharacterHybrid = ({
     camera: folder(
       {
         cameraX: { value: 0, min: -10, max: 10, step: 0.1 },
-        cameraY: { value: 0.7, min: 0, max: 10, step: 0.1 },
-        cameraZ: { value: -2.5, min: -10, max: 2, step: 0.1 },
+        cameraY: { value: 1.5, min: 0, max: 10, step: 0.1 },
+        cameraZ: { value: -5.6, min: -10, max: 2, step: 0.1 },
         targetZ: { value: 5, min: -2, max: 5, step: 0.1 },
-        cameraLerpSpeed: { value: 0.3, min: 0.01, max: 0.5, step: 0.01 },
+        cameraLerpSpeed: { value: 0.1, min: 0.01, max: 0.5, step: 0.01 },
       },
       { collapsed: true }
     ),

@@ -1,6 +1,5 @@
 import React, { forwardRef, useMemo } from "react";
-import { useControls, folder } from "leva";
-import { Clouds, Cloud } from "@react-three/drei";
+import { useControls } from "leva";
 import { HeightMapUnreal } from "./HeightMapUnreal";
 import { HeightFog } from "./HeightFog";
 import { ButterflyParticles } from "./ButterflyParticles";
@@ -8,53 +7,62 @@ import { DustParticles } from "./DustParticles";
 import { RainParticles3D } from "./RainParticles3D";
 import { WindFlag } from "./WindFlag";
 import { Mountain } from "./Mountain";
+import { ParticlesFog } from "./ParticlesFog";
+import { FloatingLeaves } from "./FloatingLeaves";
+import { CloudSystem } from "./CloudSystem";
+import { DynamicLeaves as DynamicLeaves3 } from "./DynamicLeaves3";
+import { useMountainControls } from "./useMountainControls";
+import { useWindFlagControls } from "./useWindFlagControls";
+import { useButterflyParticlesControls } from "./useButterflyParticlesControls";
+import { useDustParticlesControls } from "./useDustParticlesControls";
+import { useRainParticles3DControls } from "./useRainParticles3DControls";
+import { useHeightFogControls } from "./useHeightFogControls";
+import { useDynamicLeaves3Controls } from "./useDynamicLeaves3Controls";
+import { useHeightMapLookup } from "../hooks/useHeightMapLookup";
+import { useTerrainMeshLookup } from "../hooks/useTerrainMeshLookup";
+import { TerrainHeightDebugSpheres } from "./TerrainHeightDebugSpheres";
+import { useDebugSpheresControls } from "./useDebugSpheresControls";
 import * as THREE from "three";
 
 export const Map3 = forwardRef<any, any>(
   (
-    { scale = 1, position = [0, 0, 0] as [number, number, number], ...props },
+    {
+      scale = 1,
+      position = [0, 0, 0] as [number, number, number],
+      characterPosition,
+      characterVelocity,
+      ...props
+    },
     ref
   ) => {
-    // Function to get terrain height using raycasting on the actual terrain mesh
-    const getTerrainHeight = useMemo(() => {
-      return (x: number, z: number): number => {
-        if (!ref || typeof ref === "function" || !ref.current) return 0;
-
-        const terrainMesh = ref.current as THREE.Mesh;
-        if (!terrainMesh || !terrainMesh.geometry) return 0;
-
-        // Create a ray from above the terrain pointing down
-        const rayOrigin = new THREE.Vector3(x, 1000, z); // Start high above
-        const rayDirection = new THREE.Vector3(0, -1, 0); // Point down
-
-        const raycaster = new THREE.Raycaster(rayOrigin, rayDirection);
-        const intersects = raycaster.intersectObject(terrainMesh);
-
-        if (intersects.length > 0) {
-          return intersects[0].point.y;
-        }
-
-        return 0; // Fallback if no intersection
-      };
-    }, [ref]);
+    // Get terrain parameters from Leva (reads the SAME controls as HeightMapUnreal!)
+    // These will sync with the values shown in the Leva panel
     const {
-      enabled,
-      cloudPosition,
-      cloudScale,
-      cloudSegments,
-      bounds,
-      concentrate,
-      cloudVolume,
-      smallestVolume,
-      cloudFade,
-      cloudOpacity,
-      cloudColor,
-      speed,
-      growth,
-      cloudSeed,
-      cloudsLimit,
-      cloudsRange,
-      frustumCulled,
+      size: terrainSize,
+      heightScale: terrainHeightScale,
+      centerRegionSize: terrainCenterRegion,
+    } = useControls("🗻 Terrain Geometry", {
+      size: { value: 4000 }, // Must match what we pass to HeightMapUnreal
+      heightScale: { value: 200 }, // Must match what we pass to HeightMapUnreal
+      centerRegionSize: { value: 5 },
+    });
+
+    // NEW: Use mesh-based lookup - reads actual vertices (100% accurate, same as Rapier!)
+    const { getHeightAt: getMeshHeight, isReady: meshReady } =
+      useTerrainMeshLookup(ref as React.RefObject<THREE.Mesh>);
+
+    // Create a stable getTerrainHeight function for leaves
+    const getTerrainHeight = useMemo(
+      () => (x: number, z: number) => getMeshHeight(x, z),
+      [getMeshHeight]
+    );
+
+    // Create stable fallback vectors
+    const fallbackPosition = useMemo(() => new THREE.Vector3(0, 0, 0), []);
+    const fallbackVelocity = useMemo(() => new THREE.Vector3(0, 0, 0), []);
+
+    // Get butterflyParticles controls from separate hook
+    const {
       butterflyEnabled,
       butterflyCount,
       butterflySpawnRange,
@@ -64,16 +72,19 @@ export const Map3 = forwardRef<any, any>(
       butterflyHeightMin,
       butterflyHeightMax,
       butterflySpreadRadius,
-      heightFogEnabled,
-      fogColor,
-      fogHeight,
-      fogNear,
-      fogFar,
+    } = useButterflyParticlesControls();
+
+    // Get dustParticles controls from separate hook
+    const {
       dustEnabled,
       dustCount,
       dustSpawnRange,
       dustMaxDistance,
       dustSize,
+    } = useDustParticlesControls();
+
+    // Get rainParticles controls from separate hook
+    const {
       rainEnabled,
       rainDensity,
       rainAreaSize,
@@ -82,283 +93,27 @@ export const Map3 = forwardRef<any, any>(
       rainParticleSize,
       rainColor,
       rainOpacity,
-    } = useControls("🌤️ AMBIENCE", {
-      clouds: folder(
-        {
-          enabled: { value: false, label: "☁️ Enable Clouds" },
-          cloudPosition: {
-            value: [0, 800, 0],
-            label: "Position",
-            step: 50,
-          },
-          cloudScale: {
-            value: [1, 1, 1],
-            label: "Scale",
-            step: 0.1,
-          },
-          bounds: {
-            value: [10, 2, 2],
-            label: "Bounds",
-            step: 1,
-          },
-          cloudSegments: {
-            value: 40,
-            label: "Segments",
-            min: 10,
-            max: 100,
-            step: 5,
-          },
-          concentrate: {
-            value: "inside" as "random" | "inside" | "outside",
-            label: "Concentrate",
-            options: ["random", "inside", "outside"],
-          },
-          cloudVolume: {
-            value: 8,
-            label: "Volume",
-            min: 1,
-            max: 20,
-            step: 1,
-          },
-          smallestVolume: {
-            value: 0.25,
-            label: "Smallest Volume",
-            min: 0.1,
-            max: 1,
-            step: 0.05,
-          },
-          cloudFade: {
-            value: 10,
-            label: "Fade Distance",
-            min: 0,
-            max: 50,
-            step: 1,
-          },
-          cloudOpacity: {
-            value: 1,
-            label: "Opacity",
-            min: 0,
-            max: 1,
-            step: 0.1,
-          },
-          cloudColor: {
-            value: "#ffffff",
-            label: "Color",
-          },
-          speed: {
-            value: 0,
-            label: "Animation Speed",
-            min: 0,
-            max: 2,
-            step: 0.1,
-          },
-          growth: {
-            value: 4,
-            label: "Growth Factor",
-            min: 1,
-            max: 10,
-            step: 0.5,
-          },
-          cloudSeed: {
-            value: 0,
-            label: "Seed",
-            min: 0,
-            max: 1000,
-            step: 1,
-          },
-          cloudsLimit: {
-            value: 200,
-            label: "Clouds Limit",
-            min: 50,
-            max: 500,
-            step: 10,
-          },
-          cloudsRange: {
-            value: 200,
-            label: "Clouds Range (200 = all)",
-            min: 0,
-            max: 200,
-            step: 10,
-          },
-          frustumCulled: {
-            value: true,
-            label: "Frustum Culled",
-          },
-        },
-        { collapsed: true }
-      ),
-      butterflyParticles: folder(
-        {
-          butterflyEnabled: { value: false, label: "🦋 Enable Butterflies" },
-          butterflyCount: {
-            value: 8,
-            label: "Count",
-            min: 1,
-            max: 50,
-            step: 1,
-          },
-          butterflySpawnRange: {
-            value: 40.0,
-            label: "Spawn Range",
-            min: 10,
-            max: 100,
-            step: 5,
-          },
-          butterflyMaxDistance: {
-            value: 100.0,
-            label: "Max Distance",
-            min: 50,
-            max: 500,
-            step: 10,
-          },
-          butterflySize: {
-            value: [0.5, 1.25] as [number, number],
-            label: "Size [Width, Height]",
-            step: 0.1,
-          },
-          butterflyTexture: {
-            value: "butterfly" as "butterfly" | "moth" | "both",
-            label: "Texture",
-            options: ["butterfly", "moth", "both"],
-          },
-          butterflyHeightMin: {
-            value: 2.0,
-            label: "Height Min",
-            min: 0,
-            max: 20,
-            step: 0.5,
-          },
-          butterflyHeightMax: {
-            value: 5.0,
-            label: "Height Max",
-            min: 1,
-            max: 30,
-            step: 0.5,
-          },
-          butterflySpreadRadius: {
-            value: 1.0,
-            label: "Spread Radius",
-            min: 0.1,
-            max: 3.0,
-            step: 0.1,
-          },
-        },
-        { collapsed: true }
-      ),
-      heightFog: folder(
-        {
-          heightFogEnabled: { value: true, label: "🌫️ Enable Height Fog" },
-          fogColor: { value: "#cccccc", label: "Fog Color" },
-          fogHeight: {
-            value: 50.0,
-            label: "Fog Height",
-            min: 0,
-            max: 200,
-            step: 5,
-          },
-          fogNear: {
-            value: 1,
-            label: "Fog Near",
-            min: 0.1,
-            max: 50,
-            step: 1,
-          },
-          fogFar: {
-            value: 2300,
-            label: "Fog Far",
-            min: 10,
-            max: 5000,
-            step: 10,
-          },
-        },
-        { collapsed: true }
-      ),
-      dustParticles: folder(
-        {
-          dustEnabled: { value: false, label: "✨ Enable Dust Particles" },
-          dustCount: {
-            value: 8,
-            label: "Count",
-            min: 1,
-            max: 50,
-            step: 1,
-          },
-          dustSpawnRange: {
-            value: 20.0,
-            label: "Spawn Range",
-            min: 5,
-            max: 100,
-            step: 5,
-          },
-          dustMaxDistance: {
-            value: 50.0,
-            label: "Max Distance",
-            min: 20,
-            max: 200,
-            step: 10,
-          },
-          dustSize: {
-            value: [0.4, 0.4] as [number, number],
-            label: "Size [Width, Height]",
-            step: 0.1,
-          },
-        },
-        { collapsed: true }
-      ),
-      rainParticles: folder(
-        {
-          rainEnabled: { value: false, label: "💧 Enable Rain" },
-          rainDensity: {
-            value: 500,
-            label: "Density",
-            min: 100,
-            max: 2000,
-            step: 50,
-          },
-          rainAreaSize: {
-            value: 50.0,
-            label: "Area Size",
-            min: 20,
-            max: 200,
-            step: 10,
-          },
-          rainHeight: {
-            value: 20.0,
-            label: "Rain Height",
-            min: 5,
-            max: 100,
-            step: 5,
-          },
-          rainSpeed: {
-            value: 8.0,
-            label: "Fall Speed",
-            min: 2,
-            max: 20,
-            step: 1,
-          },
-          rainParticleSize: {
-            value: 0.01,
-            label: "Particle Size",
-            min: 0.005,
-            max: 0.05,
-            step: 0.001,
-          },
-          rainColor: {
-            value: "#d0e0ff",
-            label: "Rain Color",
-          },
-          rainOpacity: {
-            value: 0.4,
-            label: "Opacity",
-            min: 0.1,
-            max: 1.0,
-            step: 0.05,
-          },
-        },
-        { collapsed: true }
-      ),
-    });
+    } = useRainParticles3DControls();
 
+    // Get heightFog controls from separate hook
+    const { heightFogEnabled, fogColor, fogHeight, fogNear, fogFar } =
+      useHeightFogControls();
+
+    // Get mountain controls from separate hook
+    const {
+      mountainEnabled,
+      mountainPosition,
+      mountainScale,
+      mountainRotation,
+      mountainColor,
+      mountainOpacity,
+      mountainRoughness,
+      mountainMetalness,
+      mountainEmissive,
+      mountainEmissiveIntensity,
+    } = useMountainControls();
+
+    // Get windFlag controls from separate hook
     const {
       windFlagEnabled,
       windFlagPosition,
@@ -373,154 +128,20 @@ export const Map3 = forwardRef<any, any>(
       windFlagTextureQuality,
       windFlagWaveIntensity,
       windFlagYOffset,
-      mountainEnabled,
-      mountainPosition,
-      mountainScale,
-      mountainRotation,
-      mountainColor,
-      mountainOpacity,
-      mountainRoughness,
-      mountainMetalness,
-      mountainEmissive,
-      mountainEmissiveIntensity,
-    } = useControls("🏛️ OBJECTS", {
-      windFlag: folder(
-        {
-          windFlagEnabled: { value: false, label: "🏳️ Enable Wind Flag" },
-          windFlagPosition: {
-            value: [10, 0, 10],
-            label: "📍 Position [X, Z]",
-            step: 1,
-          },
-          windFlagYOffset: {
-            value: 0.0,
-            min: -5.0,
-            max: 5.0,
-            step: 0.1,
-            label: "⬆️ Y Height Offset",
-          },
-          windFlagScale: {
-            value: 1.0,
-            min: 0.1,
-            max: 3.0,
-            step: 0.1,
-            label: "📏 Scale",
-          },
-          windFlagColor: {
-            value: "#ff0000",
-            label: "🎨 Flag Color",
-          },
-          windFlagPoleHeight: {
-            value: 8,
-            min: 3,
-            max: 20,
-            step: 0.5,
-            label: "📏 Pole Height",
-          },
-          windFlagWidth: {
-            value: 3,
-            min: 1,
-            max: 8,
-            step: 0.5,
-            label: "📐 Flag Width",
-          },
-          windFlagHeight: {
-            value: 2,
-            min: 1,
-            max: 6,
-            step: 0.5,
-            label: "📐 Flag Height",
-          },
-          windFlagSegments: {
-            value: 20,
-            min: 10,
-            max: 50,
-            step: 5,
-            label: "🔢 Segments (Quality)",
-          },
-          windFlagUseTexture: {
-            value: true,
-            label: "🖼️ Use Texture",
-          },
-          windFlagTexturePath: {
-            value: "/textures/flag.png",
-            label: "📁 Texture Path",
-          },
-          windFlagTextureQuality: {
-            value: 16,
-            min: 1,
-            max: 16,
-            step: 1,
-            label: "✨ Texture Quality",
-          },
-          windFlagWaveIntensity: {
-            value: 0.8,
-            min: 0.1,
-            max: 2.0,
-            step: 0.1,
-            label: "🌊 Wave Intensity",
-          },
-        },
-        { collapsed: true }
-      ),
-      mountain: folder(
-        {
-          mountainEnabled: { value: false, label: "🏔️ Enable Mountain" },
-          mountainPosition: {
-            value: [0, 0, 0],
-            label: "📍 Position [X, Y, Z]",
-            step: 1,
-          },
-          mountainScale: {
-            value: [1, 1, 1],
-            label: "📏 Scale [X, Y, Z]",
-            step: 0.1,
-          },
-          mountainRotation: {
-            value: [0, 0, 0],
-            label: "🔄 Rotation [X, Y, Z]",
-            step: 0.1,
-          },
-          mountainColor: {
-            value: "#8B7355",
-            label: "🎨 Base Color",
-          },
-          mountainOpacity: {
-            value: 1.0,
-            min: 0.0,
-            max: 1.0,
-            step: 0.1,
-            label: "👻 Opacity",
-          },
-          mountainRoughness: {
-            value: 0.8,
-            min: 0.0,
-            max: 1.0,
-            step: 0.1,
-            label: "🔳 Roughness",
-          },
-          mountainMetalness: {
-            value: 0.0,
-            min: 0.0,
-            max: 1.0,
-            step: 0.1,
-            label: "✨ Metalness",
-          },
-          mountainEmissive: {
-            value: "#000000",
-            label: "💡 Emissive Color",
-          },
-          mountainEmissiveIntensity: {
-            value: 0.0,
-            min: 0.0,
-            max: 2.0,
-            step: 0.1,
-            label: "💡 Emissive Intensity",
-          },
-        },
-        { collapsed: true }
-      ),
-    });
+    } = useWindFlagControls();
+
+    // Get dynamicLeaves3 controls from separate hook
+    const {
+      dynamicLeaves3Enabled,
+      dynamicLeaves3Count,
+      dynamicLeaves3AreaSize,
+      dynamicLeaves3InteractionRange,
+      dynamicLeaves3PushStrength,
+      dynamicLeaves3SwirlStrength,
+    } = useDynamicLeaves3Controls();
+
+    // Get debug spheres controls
+    const { showDebugSpheres } = useDebugSpheresControls();
 
     // Calculate terrain height for WindFlag position
     // WindFlag positions pole center at poleHeight/2 above group position
@@ -557,28 +178,12 @@ export const Map3 = forwardRef<any, any>(
           scale={scale}
           {...props}
         />
-        {enabled && (
-          <Clouds
-            limit={cloudsLimit}
-            range={cloudsRange === 200 ? undefined : cloudsRange}
-            frustumCulled={frustumCulled}
-          >
-            <Cloud
-              position={cloudPosition}
-              scale={cloudScale}
-              bounds={bounds}
-              segments={cloudSegments}
-              concentrate={concentrate as "random" | "inside" | "outside"}
-              volume={cloudVolume}
-              smallestVolume={smallestVolume}
-              fade={cloudFade}
-              color={cloudColor}
-              opacity={cloudOpacity}
-              speed={speed}
-              growth={growth}
-              seed={cloudSeed}
-            />
-          </Clouds>
+        <CloudSystem />
+        {/* DEBUG: Terrain Height Spheres - Shows if mesh-based lookup is correct */}
+        {showDebugSpheres && (
+          <TerrainHeightDebugSpheres
+            terrainMeshRef={ref as React.RefObject<THREE.Mesh>}
+          />
         )}
         {/* Render single texture when not "both" */}
         {butterflyEnabled && butterflyTexture !== "both" && (
@@ -644,6 +249,10 @@ export const Map3 = forwardRef<any, any>(
             rainOpacity={rainOpacity}
           />
         )}
+        {/* Particles Fog */}
+        <ParticlesFog />
+        {/* Floating Leaves */}
+        <FloatingLeaves />
         {/* Wind Flag */}
         {windFlagEnabled && (
           <WindFlag
@@ -662,6 +271,19 @@ export const Map3 = forwardRef<any, any>(
             texturePath={windFlagTexturePath}
             textureQuality={windFlagTextureQuality}
             waveIntensity={windFlagWaveIntensity}
+          />
+        )}
+        {/* Dynamic Leaves v3 */}
+        {dynamicLeaves3Enabled && (
+          <DynamicLeaves3
+            count={dynamicLeaves3Count}
+            areaSize={dynamicLeaves3AreaSize}
+            ybotPosition={characterPosition || fallbackPosition}
+            ybotVelocity={characterVelocity || fallbackVelocity}
+            getGroundHeight={getTerrainHeight}
+            characterInteractionRange={dynamicLeaves3InteractionRange}
+            characterPushStrength={dynamicLeaves3PushStrength}
+            characterSwirlStrength={dynamicLeaves3SwirlStrength}
           />
         )}
         {/* Mountain */}
