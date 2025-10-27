@@ -215,14 +215,14 @@ const ZeldaTerrain2: React.FC<{
     centerRegionSize,
   } = useControls("🗻 Zelda Terrain 2", {
     worldSize: {
-      value: 1000,
+      value: 2000,
       min: 500,
       max: 5000,
       step: 100,
       label: "World Size",
     },
     displacementScale: {
-      value: 50,
+      value: 90,
       min: 10,
       max: 300,
       step: 10,
@@ -357,9 +357,44 @@ const ZeldaTerrain2: React.FC<{
       min: 1,
       max: 20,
       step: 1,
-      label: "🎯 Center Peak Detection",
+      label: "🎯 Center Peak Detection Size",
     },
   });
+
+  // Calculate the center peak height to position terrain correctly
+  // This calculates ONCE what the center peak height is, then we position the terrain
+  // so that the center peak ends up at Y=0 in world space
+  const centerPeakHeight = useMemo(() => {
+    // Get the heightmap image data
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d")!;
+    canvas.width = heightMap.image.width;
+    canvas.height = heightMap.image.height;
+    ctx.drawImage(heightMap.image, 0, 0);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+    // Find max height at center region
+    const centerX = Math.floor(imageData.width / 2);
+    const centerY = Math.floor(imageData.height / 2);
+    let maxCenterHeight = 0;
+
+    for (let dx = -centerRegionSize; dx <= centerRegionSize; dx++) {
+      for (let dy = -centerRegionSize; dy <= centerRegionSize; dy++) {
+        const x = Math.max(0, Math.min(imageData.width - 1, centerX + dx));
+        const y = Math.max(0, Math.min(imageData.height - 1, centerY + dy));
+        const pixelIndex = (y * imageData.width + x) * 4;
+        const height = imageData.data[pixelIndex] / 255;
+        if (height > maxCenterHeight) {
+          maxCenterHeight = height;
+        }
+      }
+    }
+
+    // Return the actual height in world units
+    const worldHeight = maxCenterHeight * displacementScale;
+    console.log(`🎯 Center peak height: ${worldHeight.toFixed(2)} units`);
+    return worldHeight;
+  }, [heightMap, displacementScale, centerRegionSize]);
 
   // Helper function to create terrain geometry with LOD
   const createTerrainGeometry = (segments: number) => {
@@ -383,10 +418,16 @@ const ZeldaTerrain2: React.FC<{
     const width = segments + 1;
     const height = segments + 1;
 
-    // First pass: collect all heights to find min/max for normalization
-    const heights: number[] = [];
+    // Create vertex colors if height gradient is enabled
+    let colors: Float32Array | null = null;
+    if (enableHeightGradient) {
+      colors = new Float32Array(vertices.length);
+    }
+
     for (let i = 0; i < height; i++) {
       for (let j = 0; j < width; j++) {
+        const index = (i * width + j) * 3;
+
         // Map vertex position to heightmap pixel
         const px = Math.floor((j / width) * canvas.width);
         const py = Math.floor((i / height) * canvas.height);
@@ -394,41 +435,13 @@ const ZeldaTerrain2: React.FC<{
 
         // Get heightmap value (using red channel, 0-255)
         const heightValue = imageData.data[pixelIndex] / 255;
-        heights.push(heightValue);
-      }
-    }
 
-    // Find min and max heights for normalization
-    let minHeight = heights[0];
-    let maxHeight = heights[0];
-    for (let i = 1; i < heights.length; i++) {
-      if (heights[i] < minHeight) minHeight = heights[i];
-      if (heights[i] > maxHeight) maxHeight = heights[i];
-    }
-    const heightRange = maxHeight - minHeight;
+        // Apply height displacement (Z becomes Y after rotation)
+        vertices[index + 2] = heightValue * displacementScale;
 
-    // Create vertex colors if height gradient is enabled
-    let colors: Float32Array | null = null;
-    if (enableHeightGradient) {
-      colors = new Float32Array(vertices.length);
-    }
-
-    // Second pass: apply normalized height displacement and colors
-    let heightIndex = 0;
-    for (let i = 0; i < height; i++) {
-      for (let j = 0; j < width; j++) {
-        const index = (i * width + j) * 3;
-        const rawHeight = heights[heightIndex++];
-
-        // Normalize height so lowest point is at 0 and highest point uses full displacementScale
-        const normalizedHeight =
-          heightRange > 0 ? (rawHeight - minHeight) / heightRange : 0;
-
-        // Apply height displacement with peak at center positioned at Y=0
-        vertices[index + 2] = normalizedHeight * displacementScale + peakOffset;
-
-        // Set vertex colors based on normalized height if gradient is enabled
+        // Set vertex colors based on height if gradient is enabled
         if (enableHeightGradient && colors) {
+          const normalizedHeight = heightValue; // Already 0-1
           let color: THREE.Color;
 
           if (normalizedHeight < lowHeightThreshold) {
@@ -543,51 +556,6 @@ const ZeldaTerrain2: React.FC<{
     enableHeightGradient,
   ]);
 
-  // Calculate peak offset for centering terrain at Y=0
-  const peakOffset = useMemo(() => {
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d")!;
-    canvas.width = heightMap.image.width;
-    canvas.height = heightMap.image.height;
-    ctx.drawImage(heightMap.image, 0, 0);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-    // Find min and max heights
-    let minHeight = 1;
-    let maxHeight = 0;
-    for (let y = 0; y < canvas.height; y++) {
-      for (let x = 0; x < canvas.width; x++) {
-        const pixelIndex = (y * canvas.width + x) * 4;
-        const heightValue = imageData.data[pixelIndex] / 255;
-        if (heightValue < minHeight) minHeight = heightValue;
-        if (heightValue > maxHeight) maxHeight = heightValue;
-      }
-    }
-    const heightRange = maxHeight - minHeight;
-
-    // Find max height at center region
-    const centerX = Math.floor(canvas.width / 2);
-    const centerY = Math.floor(canvas.height / 2);
-    let maxCenterHeight = 0;
-
-    for (let dx = -centerRegionSize; dx <= centerRegionSize; dx++) {
-      for (let dy = -centerRegionSize; dy <= centerRegionSize; dy++) {
-        const x = Math.max(0, Math.min(canvas.width - 1, centerX + dx));
-        const y = Math.max(0, Math.min(canvas.height - 1, centerY + dy));
-        const pixelIndex = (y * canvas.width + x) * 4;
-        const height = imageData.data[pixelIndex] / 255;
-        if (height > maxCenterHeight) {
-          maxCenterHeight = height;
-        }
-      }
-    }
-
-    // Calculate offset to place center peak at Y=0
-    const normalizedMaxCenterHeight =
-      (maxCenterHeight - minHeight) / heightRange;
-    return -(normalizedMaxCenterHeight * displacementScale);
-  }, [heightMap, displacementScale, centerRegionSize]);
-
   // Create heightfield data for physics collider
   const heightfieldData = useMemo(() => {
     // Get the heightmap image data
@@ -598,19 +566,6 @@ const ZeldaTerrain2: React.FC<{
     ctx.drawImage(heightMap.image, 0, 0);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-    // Find min and max for normalization
-    let minHeight = 1;
-    let maxHeight = 0;
-    for (let y = 0; y < canvas.height; y++) {
-      for (let x = 0; x < canvas.width; x++) {
-        const pixelIndex = (y * canvas.width + x) * 4;
-        const heightValue = imageData.data[pixelIndex] / 255;
-        if (heightValue < minHeight) minHeight = heightValue;
-        if (heightValue > maxHeight) maxHeight = heightValue;
-      }
-    }
-    const heightRange = maxHeight - minHeight;
-
     // Create heightfield data array
     const heights: number[] = [];
     const width = canvas.width;
@@ -619,12 +574,8 @@ const ZeldaTerrain2: React.FC<{
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const pixelIndex = (y * width + x) * 4;
-        const heightValue = imageData.data[pixelIndex] / 255;
-
-        // Normalize and apply displacement with peak offset
-        const normalizedHeight =
-          heightRange > 0 ? (heightValue - minHeight) / heightRange : 0;
-        heights.push(normalizedHeight * displacementScale + peakOffset);
+        const heightValue = imageData.data[pixelIndex] / 255; // Red channel
+        heights.push(heightValue * displacementScale);
       }
     }
 
@@ -633,9 +584,10 @@ const ZeldaTerrain2: React.FC<{
       width,
       height,
     };
-  }, [heightMap, displacementScale, peakOffset]);
+  }, [heightMap, displacementScale]);
 
   // Create heightmap lookup function for grass and other components
+  // IMPORTANT: Apply the same terrain offset (centerPeakHeight) so components spawn at correct world height
   const heightmapLookup = useMemo(() => {
     if (!heightfieldData) return null;
 
@@ -655,11 +607,13 @@ const ZeldaTerrain2: React.FC<{
       const pixelX = Math.floor(clampedX * (width - 1));
       const pixelZ = Math.floor(clampedZ * (height - 1));
 
-      // Get height value from heightfield data
+      // Get height value from heightfield data and apply terrain offset
+      // This ensures the returned height matches the actual terrain mesh position in world space
       const index = pixelZ * width + pixelX;
-      return heights[index] || 0;
+      const rawHeight = heights[index] || 0;
+      return rawHeight - centerPeakHeight; // Apply the same offset as the terrain mesh!
     };
-  }, [heightfieldData, worldSize]);
+  }, [heightfieldData, worldSize, centerPeakHeight]);
 
   // Notify parent component when heightmap lookup is ready
   useEffect(() => {
@@ -694,7 +648,6 @@ const ZeldaTerrain2: React.FC<{
     highHeightColor,
     lowHeightThreshold,
     highHeightThreshold,
-    peakOffset,
   ]);
 
   // Single large terrain mesh with LOD - Using drei Detail component
@@ -714,13 +667,17 @@ const ZeldaTerrain2: React.FC<{
       );
     }
 
+    // Calculate Y position to place center peak at Y=0
+    // terrainHeight is user-adjustable offset, centerPeakHeight is calculated from heightmap
+    const finalTerrainY = terrainHeight - centerPeakHeight;
+
     if (!enableLOD) {
       // No LOD - single geometry with trimesh physics
       return (
         <RigidBody type="fixed" colliders="trimesh" friction={1}>
           <mesh
             rotation={[-Math.PI / 2, 0, 0]}
-            position={[0, terrainHeight, 0]}
+            position={[0, finalTerrainY, 0]}
             material={terrainMaterial}
             geometry={physicsGeometry}
             receiveShadow
@@ -737,14 +694,14 @@ const ZeldaTerrain2: React.FC<{
         <RigidBody type="fixed" colliders="trimesh" friction={1}>
           <mesh
             rotation={[-Math.PI / 2, 0, 0]}
-            position={[0, terrainHeight, 0]}
+            position={[0, finalTerrainY, 0]}
             geometry={physicsGeometry}
             visible={false} // Hide physics mesh
           />
         </RigidBody>
 
         {/* Tiled Terrain LOD System - Like your grass system */}
-        <group position={[0, terrainHeight, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <group position={[0, finalTerrainY, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <TiledTerrainLOD
             worldSize={worldSize}
             segmentCount={segmentCount}
@@ -770,6 +727,7 @@ const ZeldaTerrain2: React.FC<{
     heightMap,
     displacementScale,
     terrainHeight,
+    centerPeakHeight,
     terrainMaterial,
     lodMaterials,
     showLODColors,

@@ -1,7 +1,9 @@
 import { RigidBody } from "@react-three/rapier";
 import { useRef, useMemo } from "react";
 import { DynamicLeaves as DynamicLeaves3 } from "./DynamicLeaves3";
+import { SimonDevGrass21 } from "./SimonDevGrass21/SimonDevGrass21";
 import { useDynamicLeaves3Controls } from "./useDynamicLeaves3Controls";
+import { useSimonDevGrass21Controls } from "./useSimonDevGrass21Controls";
 import * as THREE from "three";
 
 export const Map1 = ({
@@ -28,6 +30,9 @@ export const Map1 = ({
     dynamicLeaves3PushStrength,
     dynamicLeaves3SwirlStrength,
   } = useDynamicLeaves3Controls();
+
+  // Get SimonDevGrass21 controls
+  const { simonDevGrass21Enabled } = useSimonDevGrass21Controls();
 
   // Create stable fallback vectors
   const fallbackPosition = useMemo(() => new THREE.Vector3(0, 0, 0), []);
@@ -62,6 +67,17 @@ export const Map1 = ({
           characterInteractionRange={dynamicLeaves3InteractionRange}
           characterPushStrength={dynamicLeaves3PushStrength}
           characterSwirlStrength={dynamicLeaves3SwirlStrength}
+        />
+      )}
+      {/* SimonDevGrass21 Grass System - Perfect for flat plane debugging! */}
+      {simonDevGrass21Enabled && (
+        <SimonDevGrass21
+          areaSize={200}
+          mapSize={200}
+          grassHeight={1.0}
+          grassScale={1.0}
+          getGroundHeight={getGroundHeight}
+          characterPosition={characterPosition || fallbackPosition}
         />
       )}
     </group>

@@ -2,23 +2,43 @@ import React, { forwardRef, useMemo, useState, useCallback } from "react";
 import { useControls, folder } from "leva";
 import { Clouds, Cloud } from "@react-three/drei";
 import ZeldaTerrain2 from "./ZeldaTerrain2";
+import { SimonDevGrass21 } from "./SimonDevGrass21/SimonDevGrass21";
+import { useSimonDevGrass21Controls } from "./useSimonDevGrass21Controls";
 import { HeightFog } from "./HeightFog";
 import { ButterflyParticles } from "./ButterflyParticles";
 import { DustParticles } from "./DustParticles";
 import { RainParticles3D } from "./RainParticles3D";
 import { WindFlag } from "./WindFlag";
 import { Mountain } from "./Mountain";
+import { DynamicLeaves as DynamicLeaves3 } from "./DynamicLeaves3";
+import { useDynamicLeaves3Controls } from "./useDynamicLeaves3Controls";
+import { ParticlesFog } from "./ParticlesFog";
+import { FloatingLeaves } from "./FloatingLeaves";
+import { CloudSystem } from "./CloudSystem";
+import { TerrainHeightDebugSpheres } from "./TerrainHeightDebugSpheres";
+import { useDebugSpheresControls } from "./useDebugSpheresControls";
 import * as THREE from "three";
 
 export const Map5 = forwardRef<any, any>(
   (
-    { scale = 1, position = [0, 0, 0] as [number, number, number], ...props },
+    {
+      scale = 1,
+      position = [0, 0, 0] as [number, number, number],
+      characterPosition,
+      characterVelocity,
+      onTerrainReady,
+      ...props
+    },
     ref
   ) => {
     // State to hold the heightmap lookup function from ZeldaTerrain2
     const [heightmapLookup, setHeightmapLookup] = useState<
       ((x: number, z: number) => number) | null
     >(null);
+
+    // Create stable fallback vectors (same as Map3)
+    const fallbackPosition = useMemo(() => new THREE.Vector3(0, 0, 0), []);
+    const fallbackVelocity = useMemo(() => new THREE.Vector3(0, 0, 0), []);
 
     // Function to get terrain height using ZeldaTerrain2's lookup
     const getTerrainHeight = useMemo(() => {
@@ -34,8 +54,15 @@ export const Map5 = forwardRef<any, any>(
     const handleHeightmapReady = useCallback(
       (fn: (x: number, z: number) => number) => {
         setHeightmapLookup(() => fn);
+        // Notify parent that terrain is ready with a small delay
+        if (onTerrainReady) {
+          setTimeout(() => {
+            console.log("✅ Map5 terrain is ready, notifying Experience");
+            onTerrainReady();
+          }, 500); // 500ms delay to ensure physics is fully initialized
+        }
       },
-      []
+      [onTerrainReady]
     );
 
     const {
@@ -523,6 +550,22 @@ export const Map5 = forwardRef<any, any>(
       ),
     });
 
+    // Get SimonDevGrass21 controls
+    const { simonDevGrass21Enabled } = useSimonDevGrass21Controls();
+
+    // Get dynamicLeaves3 controls from separate hook
+    const {
+      dynamicLeaves3Enabled,
+      dynamicLeaves3Count,
+      dynamicLeaves3AreaSize,
+      dynamicLeaves3InteractionRange,
+      dynamicLeaves3PushStrength,
+      dynamicLeaves3SwirlStrength,
+    } = useDynamicLeaves3Controls();
+
+    // Get debug spheres controls
+    const { showDebugSpheres } = useDebugSpheresControls();
+
     // Calculate terrain height for WindFlag position
     // WindFlag positions pole center at poleHeight/2 above group position
     // So we need to place group at terrainHeight - poleHeight/2 to get pole base at terrainHeight
@@ -550,6 +593,14 @@ export const Map5 = forwardRef<any, any>(
           fogFar={fogFar}
         />
         <ZeldaTerrain2 onHeightmapReady={handleHeightmapReady} />
+        <CloudSystem />
+        {/* DEBUG: Terrain Height Spheres - Shows if heightmap-based lookup is correct */}
+        {/* Note: TerrainHeightDebugSpheres disabled for ZeldaTerrain2 as it doesn't expose mesh ref */}
+        {showDebugSpheres && ref && (
+          <TerrainHeightDebugSpheres
+            terrainMeshRef={ref as React.RefObject<THREE.Mesh>}
+          />
+        )}
         {enabled && (
           <Clouds
             limit={cloudsLimit}
@@ -637,6 +688,10 @@ export const Map5 = forwardRef<any, any>(
             rainOpacity={rainOpacity}
           />
         )}
+        {/* Particles Fog */}
+        <ParticlesFog />
+        {/* Floating Leaves */}
+        <FloatingLeaves />
         {/* Wind Flag */}
         {windFlagEnabled && (
           <WindFlag
@@ -655,6 +710,30 @@ export const Map5 = forwardRef<any, any>(
             texturePath={windFlagTexturePath}
             textureQuality={windFlagTextureQuality}
             waveIntensity={windFlagWaveIntensity}
+          />
+        )}
+        {/* SimonDevGrass21 - SAME setup as working project with ZeldaTerrain2! */}
+        {simonDevGrass21Enabled && heightmapLookup && (
+          <SimonDevGrass21
+            areaSize={200}
+            mapSize={1000}
+            grassHeight={1.0}
+            grassScale={1.0}
+            getGroundHeight={getTerrainHeight}
+            characterPosition={characterPosition || fallbackPosition}
+          />
+        )}
+        {/* Dynamic Leaves v3 */}
+        {dynamicLeaves3Enabled && (
+          <DynamicLeaves3
+            count={dynamicLeaves3Count}
+            areaSize={dynamicLeaves3AreaSize}
+            ybotPosition={characterPosition || fallbackPosition}
+            ybotVelocity={characterVelocity || fallbackVelocity}
+            getGroundHeight={getTerrainHeight}
+            characterInteractionRange={dynamicLeaves3InteractionRange}
+            characterPushStrength={dynamicLeaves3PushStrength}
+            characterSwirlStrength={dynamicLeaves3SwirlStrength}
           />
         )}
         {/* Mountain */}

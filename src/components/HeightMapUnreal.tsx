@@ -1,4 +1,10 @@
-import React, { useRef, useMemo, forwardRef } from "react";
+import React, {
+  useRef,
+  useMemo,
+  forwardRef,
+  useEffect,
+  useCallback,
+} from "react";
 import { useLoader } from "@react-three/fiber";
 import { RigidBody } from "@react-three/rapier";
 import { TextureLoader } from "three";
@@ -11,6 +17,7 @@ interface HeightMapUnrealProps {
   heightScale?: number;
   position?: [number, number, number];
   scale?: number;
+  onHeightmapReady?: (fn: (x: number, z: number) => number) => void;
 }
 
 // Helper function to create gradient color based on height
@@ -51,6 +58,7 @@ export const HeightMapUnreal = forwardRef<THREE.Mesh, HeightMapUnrealProps>(
       heightScale: initialHeightScale = 100,
       position = [0, 0, 0],
       scale = 1,
+      onHeightmapReady,
       ...props
     },
     ref
@@ -126,22 +134,132 @@ export const HeightMapUnreal = forwardRef<THREE.Mesh, HeightMapUnrealProps>(
       "/textures/unreal-heightmap.png"
     ) as THREE.Texture;
 
+    // Cache the heightmap image data ONCE - this is expensive! (Same pattern as ZeldaTerrain2)
+    const heightmapImageData = useMemo(() => {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+
+      canvas.width = heightmapTexture.image.width;
+      canvas.height = heightmapTexture.image.height;
+      ctx.drawImage(heightmapTexture.image, 0, 0);
+      return ctx.getImageData(0, 0, canvas.width, canvas.height);
+    }, [heightmapTexture]);
+
+    // Store height data for lookup function (processed once, shared with grass)
+    const heightData = useMemo(() => {
+      if (!heightmapImageData) return null;
+
+      const data = heightmapImageData.data;
+      const canvas = {
+        width: heightmapImageData.width,
+        height: heightmapImageData.height,
+      };
+
+      // Find min and max heights for normalization
+      const heights: number[] = [];
+      for (let y = 0; y < canvas.height; y++) {
+        for (let x = 0; x < canvas.width; x++) {
+          const pixelIndex = (y * canvas.width + x) * 4;
+          const height = data[pixelIndex] / 255;
+          heights.push(height);
+        }
+      }
+
+      let minHeight = heights[0];
+      let maxHeight = heights[0];
+      for (let i = 1; i < heights.length; i++) {
+        if (heights[i] < minHeight) minHeight = heights[i];
+        if (heights[i] > maxHeight) maxHeight = heights[i];
+      }
+      const heightRange = maxHeight - minHeight;
+
+      // Find max height at center region
+      const centerX = Math.floor(canvas.width / 2);
+      const centerY = Math.floor(canvas.height / 2);
+      let maxCenterHeight = 0;
+
+      for (let dx = -centerRegionSize; dx <= centerRegionSize; dx++) {
+        for (let dy = -centerRegionSize; dy <= centerRegionSize; dy++) {
+          const x = Math.max(0, Math.min(canvas.width - 1, centerX + dx));
+          const y = Math.max(0, Math.min(canvas.height - 1, centerY + dy));
+          const pixelIndex = (y * canvas.width + x) * 4;
+          const height = data[pixelIndex] / 255;
+          if (height > maxCenterHeight) {
+            maxCenterHeight = height;
+          }
+        }
+      }
+
+      // Calculate offset to place center peak at Y=0
+      const normalizedMaxCenterHeight =
+        (maxCenterHeight - minHeight) / heightRange;
+      const peakOffset = -(normalizedMaxCenterHeight * heightScale);
+
+      // Create normalized height array
+      const normalizedHeights: number[] = [];
+      for (let i = 0; i < heights.length; i++) {
+        const normalizedHeight =
+          heightRange > 0 ? (heights[i] - minHeight) / heightRange : 0;
+        normalizedHeights.push(normalizedHeight * heightScale + peakOffset);
+      }
+
+      return {
+        heights: normalizedHeights,
+        width: canvas.width,
+        height: canvas.height,
+        minHeight,
+        maxHeight,
+        heightRange,
+        peakOffset,
+      };
+    }, [heightmapImageData, heightScale, centerRegionSize]);
+
+    // Create heightmap lookup function for grass and other components (SAME as ZeldaTerrain2!)
+    const heightmapLookup = useMemo(() => {
+      if (!heightData) return null;
+
+      return (x: number, z: number): number => {
+        // Convert world coordinates to heightmap coordinates
+        const normalizedX = (x + size / 2) / size;
+        const normalizedZ = (z + size / 2) / size;
+
+        // Clamp to valid range
+        const clampedX = Math.max(0, Math.min(1, normalizedX));
+        const clampedZ = Math.max(0, Math.min(1, normalizedZ));
+
+        // Convert to pixel coordinates
+        const pixelX = Math.floor(clampedX * (heightData.width - 1));
+        const pixelZ = Math.floor(clampedZ * (heightData.height - 1));
+
+        // Get height value from stored height data
+        const index = pixelZ * heightData.width + pixelX;
+        return heightData.heights[index] || 0;
+      };
+    }, [heightData, size]);
+
+    // Notify parent component when heightmap lookup is ready (SAME as ZeldaTerrain2!)
+    useEffect(() => {
+      if (heightmapLookup && onHeightmapReady) {
+        console.log(
+          "✅ HeightMapUnreal: Heightmap lookup ready, notifying Map3"
+        );
+        onHeightmapReady(heightmapLookup);
+      }
+    }, [heightmapLookup, onHeightmapReady]);
+
     // Create geometry with heightmap displacement
     const geometry = useMemo(() => {
       const geometry = new THREE.PlaneGeometry(size, size, segments, segments);
 
-      // Get the heightmap data
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return new THREE.PlaneGeometry(size, size, segments, segments);
+      // Use cached heightmap image data (no canvas recreation!)
+      if (!heightmapImageData) return geometry;
 
-      canvas.width = heightmapTexture.image.width;
-      canvas.height = heightmapTexture.image.height;
-
-      // Draw the texture to canvas to get pixel data
-      ctx.drawImage(heightmapTexture.image, 0, 0);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imageData.data;
+      const data = heightmapImageData.data;
+      const canvas = {
+        width: heightmapImageData.width,
+        height: heightmapImageData.height,
+      };
 
       // Get vertex positions
       const positions = geometry.attributes.position.array;
@@ -248,7 +366,7 @@ export const HeightMapUnreal = forwardRef<THREE.Mesh, HeightMapUnrealProps>(
 
       return geometry;
     }, [
-      heightmapTexture,
+      heightmapImageData,
       size,
       segments,
       heightScale,

@@ -5,7 +5,7 @@ import {
 } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
 import { useControls, folder } from "leva";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { GodotCharacterHybrid } from "./GodotCharacterHybrid";
 import * as THREE from "three";
 import { Map1 } from "./Map1";
@@ -20,6 +20,7 @@ import {
   getSafeSpawnPosition,
   getTerrainHeightFromTexture,
 } from "../utils/terrainUtils";
+import { SSAOEffect } from "./SSAOEffect";
 
 const maps = {
   map1: {
@@ -51,6 +52,7 @@ export const Experience = () => {
     0, 10, 0,
   ]);
   const [deerSpawnPosition, setDeerSpawnPosition] = useState([5, 1, 5]);
+  const [isTerrainReady, setIsTerrainReady] = useState(false); // Track terrain readiness
 
   // Track character position and velocity for dynamic effects
   const characterPositionVector = useRef(new THREE.Vector3());
@@ -104,8 +106,25 @@ export const Experience = () => {
     showTestSphere,
   } = useLightsControls();
 
+  // Callback when terrain is ready (for Map5)
+  const handleTerrainReady = useCallback(() => {
+    console.log("✅ Terrain ready, spawning character in 100ms...");
+    setTimeout(() => {
+      setIsTerrainReady(true);
+    }, 100); // Small additional delay
+  }, []);
+
   // Calculate smart spawn positions when map changes
   useEffect(() => {
+    // Reset terrain ready state when map changes
+    setIsTerrainReady(false);
+    console.log(`🗺️ Map changed to: ${map}, terrain ready reset to false`);
+
+    // For Map5, wait for terrain callback. For others, mark ready immediately
+    if (map !== "map5") {
+      setIsTerrainReady(true);
+    }
+
     if (map === "map3") {
       // Use texture-based calculation for Map3 (no delay needed)
       // Map3 parameters: size=4000, heightScale=200, peak at Y=0
@@ -125,20 +144,10 @@ export const Experience = () => {
       setCharacterSpawnPosition(characterPos);
       setDeerSpawnPosition(deerPos);
     } else if (map === "map5") {
-      // Use texture-based calculation for Map5 (ZeldaTerrain2)
-      // Map5 parameters: worldSize=1000, displacementScale=50, peak at Y=0
-      const characterHeight = getTerrainHeightFromTexture(
-        0,
-        0,
-        null,
-        1000,
-        50,
-        0
-      );
-      const deerHeight = getTerrainHeightFromTexture(5, 5, null, 1000, 50, 0);
-
-      const characterPos = [0, characterHeight + 2, 0];
-      const deerPos = [5, 1, 5]; // Fixed at ground level with slight clearance
+      // For Map5 (ZeldaTerrain2), the terrain is positioned so center peak is at Y=0
+      // So spawn character at Y=2 (2 units above the center peak)
+      const characterPos = [0, 2, 0];
+      const deerPos = [5, 2, 5];
 
       setCharacterSpawnPosition(characterPos);
       setDeerSpawnPosition(deerPos);
@@ -225,23 +234,34 @@ export const Experience = () => {
             ref={terrainMeshRef}
             scale={maps[map].scale}
             position={maps[map].position}
+            characterPosition={characterPositionVector.current}
+            characterVelocity={characterVelocity.current}
+            onTerrainReady={handleTerrainReady}
           />
         )}
-        <GodotCharacterHybrid
-          cameraMode={cameraMode}
-          position={characterSpawnPosition}
-          onPositionChange={(pos) => {
-            characterPositionVector.current.set(pos[0], pos[1], pos[2]);
-          }}
-          onVelocityChange={(vel) => {
-            characterVelocity.current.set(vel[0], vel[1], vel[2]);
-          }}
-        />
-        <DeerController
-          position={deerSpawnPosition}
-          terrainMesh={terrainMeshRef.current}
-        />
-        <DeerHerd terrainMesh={terrainMeshRef.current} />
+        {/* Only spawn character when terrain is ready */}
+        {isTerrainReady && (
+          <GodotCharacterHybrid
+            cameraMode={cameraMode}
+            position={characterSpawnPosition}
+            onPositionChange={(pos) => {
+              characterPositionVector.current.set(pos[0], pos[1], pos[2]);
+            }}
+            onVelocityChange={(vel) => {
+              characterVelocity.current.set(vel[0], vel[1], vel[2]);
+            }}
+          />
+        )}
+        {/* Only spawn deer when terrain is ready */}
+        {isTerrainReady && (
+          <>
+            <DeerController
+              position={deerSpawnPosition}
+              terrainMesh={terrainMeshRef.current}
+            />
+            <DeerHerd terrainMesh={terrainMeshRef.current} />
+          </>
+        )}
       </Physics>
       {showTestSphere && (
         <mesh position={[0, 2, 5]} castShadow>
@@ -253,6 +273,8 @@ export const Experience = () => {
           />
         </mesh>
       )}
+      {/* Post-processing effects */}
+      <SSAOEffect />
     </>
   );
 };
