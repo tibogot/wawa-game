@@ -1,7 +1,13 @@
 import React, { useRef, Suspense, useEffect } from "react";
 import * as THREE from "three";
 import { useThree } from "@react-three/fiber";
-import { EffectComposer, SMAA, N8AO, Bloom } from "@react-three/postprocessing";
+import {
+  ToneMapping,
+  EffectComposer,
+  SMAA,
+  N8AO,
+  Bloom,
+} from "@react-three/postprocessing";
 import { BlendFunction, SMAAPreset } from "postprocessing";
 import { useControls, folder } from "leva";
 
@@ -200,6 +206,10 @@ export const SSAOEffect = () => {
           multisampling={multisampling}
           frameBufferType={THREE.HalfFloatType}
         >
+          <ToneMapping
+            toneMapping={ToneMapping.ACESFilmic}
+            toneMappingExposure={1.0}
+          />
           {/* N8AO - Advanced ambient occlusion (works with R3F!) */}
           {enabled && (
             <N8AO

@@ -30,7 +30,8 @@ interface OctahedralForestProps {
   minRadius: number;
   radius: number;
   treeCount: number;
-  terrainMesh?: THREE.Mesh; // For height sampling
+  terrainMesh?: THREE.Mesh; // For height sampling via raycasting
+  getTerrainHeight?: (x: number, z: number) => number; // Alternative: direct height lookup
   lodDistances?: { mid: number; far: number };
   impostorSettings?: {
     spritesPerSide?: number;
@@ -47,6 +48,7 @@ export const OctahedralForest: React.FC<OctahedralForestProps> = ({
   radius,
   treeCount,
   terrainMesh,
+  getTerrainHeight,
   lodDistances = { mid: 20, far: 100 }, // Exact same as demo!
   impostorSettings = {
     spritesPerSide: 12,
@@ -125,7 +127,11 @@ export const OctahedralForest: React.FC<OctahedralForestProps> = ({
 
         // Sample terrain height if available
         let y = centerPosition[1];
-        if (terrainMesh) {
+        if (getTerrainHeight) {
+          // Use custom height function (faster, for heightmap-based terrains)
+          y = getTerrainHeight(x, z);
+        } else if (terrainMesh) {
+          // Fall back to raycasting (for mesh-based terrains)
           const raycaster = new THREE.Raycaster();
           raycaster.set(
             new THREE.Vector3(x, 1000, z),
@@ -279,6 +285,7 @@ export const OctahedralForest: React.FC<OctahedralForestProps> = ({
     minRadius,
     radius,
     terrainMesh,
+    getTerrainHeight,
     lodDistances,
     impostorSettings,
     threeScene,

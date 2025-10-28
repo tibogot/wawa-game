@@ -327,15 +327,15 @@ const ZeldaTerrain2: React.FC<{
       label: "🌈 Enable Height Gradient",
     },
     lowHeightColor: {
-      value: "#2d5016", // Dark green for low areas
+      value: "#2d4e17", // Dark green for low areas
       label: "🟢 Low Height Color",
     },
     midHeightColor: {
-      value: "#8b4513", // Brown for mid areas
+      value: "#152e04", // Brown for mid areas
       label: "🟤 Mid Height Color",
     },
     highHeightColor: {
-      value: "#214807", // White for high areas
+      value: "#152e04", // White for high areas
       label: "⚪ High Height Color",
     },
     lowHeightThreshold: {

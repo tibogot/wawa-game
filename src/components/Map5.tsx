@@ -4,7 +4,10 @@ import { Clouds, Cloud } from "@react-three/drei";
 import ZeldaTerrain2 from "./ZeldaTerrain2";
 import { SimonDevGrass21 } from "./SimonDevGrass21/SimonDevGrass21";
 import { useSimonDevGrass21Controls } from "./useSimonDevGrass21Controls";
+import { ImpostorForest } from "./ImpostorForest";
+import { useImpostorForestControls } from "./useImpostorForestControls";
 import { HeightFog } from "./HeightFog";
+import { useHeightFogControls } from "./useHeightFogControls";
 import { ButterflyParticles } from "./ButterflyParticles";
 import { DustParticles } from "./DustParticles";
 import { RainParticles3D } from "./RainParticles3D";
@@ -17,6 +20,12 @@ import { FloatingLeaves } from "./FloatingLeaves";
 import { CloudSystem } from "./CloudSystem";
 import { TerrainHeightDebugSpheres } from "./TerrainHeightDebugSpheres";
 import { useDebugSpheresControls } from "./useDebugSpheresControls";
+import { useLensFlareControls } from "./useLensFlareControls";
+import LensFlare from "./LensFlare";
+import { FlowingLinesSimple } from "./FlowingLinesSimple";
+import { useFlowingLinesControls } from "./useFlowingLinesControls";
+import { MovingShadowPlanes } from "./MovingShadowPlanes";
+import { useMovingShadowPlanesControls } from "./useMovingShadowPlanesControls";
 import * as THREE from "three";
 
 export const Map5 = forwardRef<any, any>(
@@ -65,6 +74,10 @@ export const Map5 = forwardRef<any, any>(
       [onTerrainReady]
     );
 
+    // Get Height Fog controls from hook
+    const { heightFogEnabled, fogColor, fogHeight, fogNear, fogFar } =
+      useHeightFogControls();
+
     const {
       enabled,
       cloudPosition,
@@ -92,11 +105,6 @@ export const Map5 = forwardRef<any, any>(
       butterflyHeightMin,
       butterflyHeightMax,
       butterflySpreadRadius,
-      heightFogEnabled,
-      fogColor,
-      fogHeight,
-      fogNear,
-      fogFar,
       dustEnabled,
       dustCount,
       dustSpawnRange,
@@ -269,34 +277,6 @@ export const Map5 = forwardRef<any, any>(
             min: 0.1,
             max: 3.0,
             step: 0.1,
-          },
-        },
-        { collapsed: true }
-      ),
-      heightFog: folder(
-        {
-          heightFogEnabled: { value: true, label: "🌫️ Enable Height Fog" },
-          fogColor: { value: "#cccccc", label: "Fog Color" },
-          fogHeight: {
-            value: 50.0,
-            label: "Fog Height",
-            min: 0,
-            max: 200,
-            step: 5,
-          },
-          fogNear: {
-            value: 1,
-            label: "Fog Near",
-            min: 0.1,
-            max: 50,
-            step: 1,
-          },
-          fogFar: {
-            value: 2300,
-            label: "Fog Far",
-            min: 10,
-            max: 5000,
-            step: 10,
           },
         },
         { collapsed: true }
@@ -553,6 +533,19 @@ export const Map5 = forwardRef<any, any>(
     // Get SimonDevGrass21 controls
     const { simonDevGrass21Enabled } = useSimonDevGrass21Controls();
 
+    // Get ImpostorForest controls
+    const {
+      impostorForestEnabled,
+      treeCount,
+      radius,
+      minRadius,
+      centerX,
+      centerY,
+      centerZ,
+      lodMid,
+      lodFar,
+    } = useImpostorForestControls();
+
     // Get dynamicLeaves3 controls from separate hook
     const {
       dynamicLeaves3Enabled,
@@ -565,6 +558,46 @@ export const Map5 = forwardRef<any, any>(
 
     // Get debug spheres controls
     const { showDebugSpheres } = useDebugSpheresControls();
+
+    // Get LensFlare controls
+    const {
+      lensFlareEnabled,
+      lensFlare1Enabled,
+      lensFlare1Position,
+      lensFlare1H,
+      lensFlare1S,
+      lensFlare1L,
+      lensFlare1Intensity,
+      lensFlare2Enabled,
+      lensFlare2Position,
+      lensFlare2H,
+      lensFlare2S,
+      lensFlare2L,
+      lensFlare2Intensity,
+      lensFlare3Enabled,
+      lensFlare3Position,
+      lensFlare3H,
+      lensFlare3S,
+      lensFlare3L,
+      lensFlare3Intensity,
+      flareDistance,
+    } = useLensFlareControls();
+
+    // Get FlowingLines controls
+    const { enabled: flowingLinesEnabled } = useFlowingLinesControls();
+
+    // Get MovingShadowPlanes controls
+    const {
+      enabled: movingShadowPlanesEnabled,
+      planeCount,
+      planeSize,
+      planeHeight,
+      moveSpeed,
+      moveRange,
+      planeOpacity,
+      planeColor,
+      followPlayer,
+    } = useMovingShadowPlanesControls();
 
     // Calculate terrain height for WindFlag position
     // WindFlag positions pole center at poleHeight/2 above group position
@@ -723,6 +756,18 @@ export const Map5 = forwardRef<any, any>(
             characterPosition={characterPosition || fallbackPosition}
           />
         )}
+        {/* ImpostorForest - Octahedral impostor-based trees that follow terrain! */}
+        {impostorForestEnabled && heightmapLookup && (
+          <ImpostorForest
+            centerPosition={[centerX, centerY, centerZ]}
+            radius={radius}
+            minRadius={minRadius}
+            treeCount={treeCount}
+            modelPath="/models/tree.glb"
+            lodDistances={{ mid: lodMid, low: lodFar }}
+            getTerrainHeight={getTerrainHeight}
+          />
+        )}
         {/* Dynamic Leaves v3 */}
         {dynamicLeaves3Enabled && (
           <DynamicLeaves3
@@ -749,6 +794,76 @@ export const Map5 = forwardRef<any, any>(
           mountainEmissive={mountainEmissive}
           mountainEmissiveIntensity={mountainEmissiveIntensity}
         />
+        {/* Lens Flares */}
+        {lensFlareEnabled && (
+          <>
+            {lensFlare1Enabled && (
+              <LensFlare
+                position={[
+                  lensFlare1Position.x,
+                  lensFlare1Position.y,
+                  lensFlare1Position.z,
+                ]}
+                h={lensFlare1H}
+                s={lensFlare1S}
+                l={lensFlare1L}
+                intensity={lensFlare1Intensity}
+                distance={flareDistance}
+              />
+            )}
+            {lensFlare2Enabled && (
+              <LensFlare
+                position={[
+                  lensFlare2Position.x,
+                  lensFlare2Position.y,
+                  lensFlare2Position.z,
+                ]}
+                h={lensFlare2H}
+                s={lensFlare2S}
+                l={lensFlare2L}
+                intensity={lensFlare2Intensity}
+                distance={flareDistance}
+              />
+            )}
+            {lensFlare3Enabled && (
+              <LensFlare
+                position={[
+                  lensFlare3Position.x,
+                  lensFlare3Position.y,
+                  lensFlare3Position.z,
+                ]}
+                h={lensFlare3H}
+                s={lensFlare3S}
+                l={lensFlare3L}
+                intensity={lensFlare3Intensity}
+                distance={flareDistance}
+              />
+            )}
+          </>
+        )}
+        {/* Flowing Lines */}
+        {flowingLinesEnabled && heightmapLookup && (
+          <FlowingLinesSimple
+            enabled={flowingLinesEnabled}
+            lineCount={10}
+            getTerrainHeight={getTerrainHeight}
+          />
+        )}
+        {/* Moving Shadow Planes */}
+        {movingShadowPlanesEnabled && (
+          <MovingShadowPlanes
+            characterPosition={characterPosition || fallbackPosition}
+            enabled={movingShadowPlanesEnabled}
+            planeCount={planeCount}
+            planeSize={planeSize}
+            planeHeight={planeHeight}
+            moveSpeed={moveSpeed}
+            moveRange={moveRange}
+            planeOpacity={planeOpacity}
+            planeColor={planeColor}
+            followPlayer={followPlayer}
+          />
+        )}
       </group>
     );
   }

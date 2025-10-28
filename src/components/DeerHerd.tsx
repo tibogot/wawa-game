@@ -129,7 +129,7 @@ export const DeerHerd: React.FC<DeerHerdProps> = ({ terrainMesh }) => {
           label: "🌑 Receive Shadow",
         },
         colliderRadius: {
-          value: 0.7,
+          value: 1,
           min: 0.1,
           max: 2.0,
           step: 0.1,
@@ -143,7 +143,7 @@ export const DeerHerd: React.FC<DeerHerdProps> = ({ terrainMesh }) => {
           label: "📏 Collider Height",
         },
         colliderOffsetY: {
-          value: 0.7,
+          value: 1,
           min: -2.0,
           max: 2.0,
           step: 0.1,
@@ -374,12 +374,14 @@ const DeerWithPhysics: React.FC<{
       type="dynamic"
       position={spawnPosition}
       colliders={false}
+      ccd={true}
+      enabledRotations={[false, false, false]}
     >
       <CylinderCollider
         args={[colliderRadius, colliderHeight]}
         position={[0, colliderOffsetY, 0]}
-        friction={0.8}
-        restitution={0.1}
+        friction={0}
+        restitution={0}
       />
       <Deer
         ref={deer.groupRef}

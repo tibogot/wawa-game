@@ -28,6 +28,7 @@ interface ImpostorForestProps {
   leavesOpacity?: number;
   leavesAlphaTest?: number;
   terrainMesh?: THREE.Mesh | null;
+  getTerrainHeight?: (x: number, z: number) => number;
 }
 
 export const ImpostorForest: React.FC<ImpostorForestProps> = ({
@@ -35,9 +36,10 @@ export const ImpostorForest: React.FC<ImpostorForestProps> = ({
   radius = 100,
   minRadius = 50,
   treeCount = 100,
-  modelPath = "/octahedral-impostor-main/public/tree.glb",
+  modelPath = "/models/tree.glb",
   lodDistances = { mid: 100, low: 180 },
   terrainMesh,
+  getTerrainHeight,
 }) => {
   // Now using proper OctahedralForest with 3-LOD system!
   // LOD distances converted to octahedral system:
@@ -52,6 +54,7 @@ export const ImpostorForest: React.FC<ImpostorForestProps> = ({
       radius={radius}
       treeCount={treeCount}
       terrainMesh={terrainMesh || undefined}
+      getTerrainHeight={getTerrainHeight}
       lodDistances={{
         mid: 20, // meshoptimizer LOD starts at 20m (demo standard)
         far: 100, // impostor LOD starts at 100m (demo standard)

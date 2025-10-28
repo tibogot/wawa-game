@@ -21,7 +21,7 @@ export const useHeightFogControls = () => {
           step: 1,
         },
         fogFar: {
-          value: 2300,
+          value: 1300,
           label: "Fog Far",
           min: 10,
           max: 5000,
