@@ -1,13 +1,7 @@
 import React, { useRef, Suspense, useEffect } from "react";
 import * as THREE from "three";
 import { useThree } from "@react-three/fiber";
-import {
-  ToneMapping,
-  EffectComposer,
-  SMAA,
-  N8AO,
-  Bloom,
-} from "@react-three/postprocessing";
+import { EffectComposer, SMAA, N8AO, Bloom } from "@react-three/postprocessing";
 import { BlendFunction, SMAAPreset } from "postprocessing";
 import { useControls, folder } from "leva";
 
@@ -179,7 +173,7 @@ export const SSAOEffect = () => {
   // Set up color management
   useEffect(() => {
     THREE.ColorManagement.enabled = enableColorManagement;
-    console.log(`🎨 Color Management enabled: ${enableColorManagement}`);
+    // console.log(`🎨 Color Management enabled: ${enableColorManagement}`);
   }, [enableColorManagement]);
 
   // Map preset string to SMAAPreset enum
@@ -205,11 +199,9 @@ export const SSAOEffect = () => {
         <EffectComposer
           multisampling={multisampling}
           frameBufferType={THREE.HalfFloatType}
+          enabled={true}
+          renderPriority={1}
         >
-          <ToneMapping
-            toneMapping={ToneMapping.ACESFilmic}
-            toneMappingExposure={1.0}
-          />
           {/* N8AO - Advanced ambient occlusion (works with R3F!) */}
           {enabled && (
             <N8AO
@@ -238,7 +230,7 @@ export const SSAOEffect = () => {
 
           {/* SMAA Anti-Aliasing - Shader-based AA */}
           {antiAliasingMode === "smaa" && (
-            <SMAA preset={smaaPresetMap[smaaPreset]} outputEncoding={false} />
+            <SMAA preset={smaaPresetMap[smaaPreset]} />
           )}
         </EffectComposer>
       </Suspense>

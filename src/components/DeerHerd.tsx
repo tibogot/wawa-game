@@ -31,9 +31,13 @@ interface DeerInstance {
 
 interface DeerHerdProps {
   terrainMesh?: THREE.Mesh | null; // Optional terrain for height sampling
+  spawnHeight?: number; // Y position to spawn deer at (should match character spawn height)
 }
 
-export const DeerHerd: React.FC<DeerHerdProps> = ({ terrainMesh }) => {
+export const DeerHerd: React.FC<DeerHerdProps> = ({
+  terrainMesh,
+  spawnHeight = 20,
+}) => {
   const [deerInstances, setDeerInstances] = useState<DeerInstance[]>([]);
   const { animations } = useGLTF("/models/Deer.gltf");
 
@@ -234,6 +238,7 @@ export const DeerHerd: React.FC<DeerHerdProps> = ({ terrainMesh }) => {
           rotationSpeed={rotationSpeed}
           mapBoundary={mapBoundary}
           spawnRadius={spawnRadius}
+          spawnHeight={spawnHeight}
           colliderRadius={colliderRadius}
           colliderHeight={colliderHeight}
           colliderOffsetY={colliderOffsetY}
@@ -255,6 +260,7 @@ const DeerWithPhysics: React.FC<{
   rotationSpeed: number;
   mapBoundary: number;
   spawnRadius: number;
+  spawnHeight: number;
   colliderRadius: number;
   colliderHeight: number;
   colliderOffsetY: number;
@@ -269,20 +275,21 @@ const DeerWithPhysics: React.FC<{
   rotationSpeed,
   mapBoundary,
   spawnRadius,
+  spawnHeight,
   colliderRadius,
   colliderHeight,
   colliderOffsetY,
 }) => {
   const { actions } = useAnimations(animations, deer.groupRef);
 
-  // Calculate spawn position (close to ground to avoid rolling from high fall)
+  // Calculate spawn position (spawn high above terrain, let physics drop them down)
   const spawnPosition: [number, number, number] = React.useMemo(() => {
     const angle = (deer.id / 10) * Math.PI * 2 + Math.random() * 0.5;
     const distance = spawnRadius * (0.5 + Math.random() * 0.5);
     const x = Math.cos(angle) * distance;
     const z = Math.sin(angle) * distance;
-    return [x, 0.5, z]; // Lower spawn height to prevent rolling
-  }, [deer.id, spawnRadius]);
+    return [x, spawnHeight, z]; // Use spawnHeight (same as character spawn)
+  }, [deer.id, spawnRadius, spawnHeight]);
 
   // Play animation based on AI state
   useEffect(() => {

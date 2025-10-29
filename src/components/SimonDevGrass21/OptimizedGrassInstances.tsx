@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { useAdaptiveLODSystem } from "./AdaptiveLODSystem";
@@ -45,6 +45,7 @@ export const useOptimizedGrassInstances = ({
   const tilesRef = useRef<any[]>([]);
   const lastUpdateTimeRef = useRef(0);
   const instancedMeshRef = useRef<THREE.Group | null>(null);
+  const hasInitializedRef = useRef(false);
 
   // Initialize optimization systems
   const adaptiveLOD = useAdaptiveLODSystem();
@@ -62,15 +63,22 @@ export const useOptimizedGrassInstances = ({
     GRASS_ULTRA_LOW_DISTANCE,
     TILE_SIZE: 10,
     GRASS_PER_TILE_HIGH: 2000,
-    GRASS_PER_TILE_LOW: 2000,
-    GRASS_PER_TILE_ULTRA_LOW: 3000,
+    GRASS_PER_TILE_LOW: 1500,
+    GRASS_PER_TILE_ULTRA_LOW: 1500,
   };
 
-  // Main grass creation with frustum culling
-  useEffect(() => {
-    if (instancedMeshRef.current || isCreatingGrassRef.current) {
+  // Initialize grass on first frame when camera is ready
+  // Use useFrame to ensure camera position is set (especially important for follow camera)
+  useFrame(() => {
+    if (
+      instancedMeshRef.current ||
+      isCreatingGrassRef.current ||
+      hasInitializedRef.current
+    ) {
       return;
     }
+
+    hasInitializedRef.current = true;
 
     isCreatingGrassRef.current = true;
 
@@ -119,35 +127,63 @@ export const useOptimizedGrassInstances = ({
       const instancedMesh = new THREE.Group();
       instancedMeshRef.current = instancedMesh;
 
+      // Ensure camera matrices are up to date
+      camera.updateMatrixWorld(true);
+      camera.updateProjectionMatrix();
+
+      // Force frustum update to ensure correct culling state
+      frustumCulling.forceUpdate();
+
       // Get initial camera position
       const initialCameraPos = camera.position.clone();
+
+      // Maximum distance for initial creation
+      const INITIAL_CREATION_DISTANCE = 150; // Create tiles within this distance
+      // Close distance: always create tiles near character regardless of frustum (safety zone)
+      const CLOSE_DISTANCE = 60; // Within this distance, ignore frustum to ensure grass around character
+
       let visibleTiles = 0;
       let culledTiles = 0;
 
-      // Apply frustum culling to all tiles first
+      // Apply frustum culling to all tiles first (but we'll be lenient for close tiles)
       const tilesWithIds = tiles.map((tile, index) => ({
         ...tile,
         id: `tile_${index}`,
       }));
 
-      const { visible: visibleTileIds, culled: culledTileIds } =
+      const { visible: visibleTileIds } =
         frustumCulling.cullTiles(tilesWithIds);
 
-      // Create initial meshes for visible tiles only
+      // Create initial meshes - hybrid approach: distance + conditional frustum
       tiles.forEach((tile, index) => {
         const tileId = `tile_${index}`;
 
-        // Check frustum culling first
+        // Calculate distance from camera
+        const distance = Math.sqrt(
+          Math.pow(tile.centerX - initialCameraPos.x, 2) +
+            Math.pow(tile.centerZ - initialCameraPos.z, 2)
+        );
+        tile.distanceToCamera = distance;
+
+        // Check distance
+        const isWithinDistance = distance <= INITIAL_CREATION_DISTANCE;
+        const isCloseToCharacter = distance <= CLOSE_DISTANCE;
+
+        // Frustum check: required for far tiles, optional for close tiles
+        // Close tiles: always create (ensures grass around character even if frustum is wrong)
+        // Far tiles: must pass frustum check (culls tiles behind camera)
         const isFrustumVisible = enableFrustumCulling
-          ? visibleTileIds.includes(tileId)
-          : true;
+          ? isCloseToCharacter || visibleTileIds.includes(tileId) // Close tiles skip frustum
+          : true; // If frustum culling disabled, allow all
 
-        // Then check LOD visibility
+        // Check LOD visibility (distance-based)
         const isLODVisible =
-          disableChunkRemoval || adaptiveLOD.isTileVisible(tile, camera);
+          disableChunkRemoval ||
+          isWithinDistance ||
+          adaptiveLOD.isTileVisible(tile, camera);
 
-        // Tile is visible only if both frustum and LOD checks pass
-        const isVisible = isFrustumVisible && isLODVisible;
+        // Tile is visible if: within distance AND (close OR in frustum) AND LOD check passes
+        const isVisible = isWithinDistance && isFrustumVisible && isLODVisible;
 
         if (!isVisible) {
           culledTiles++;
@@ -155,12 +191,6 @@ export const useOptimizedGrassInstances = ({
         }
 
         visibleTiles++;
-
-        const distance = Math.sqrt(
-          Math.pow(tile.centerX - initialCameraPos.x, 2) +
-            Math.pow(tile.centerZ - initialCameraPos.z, 2)
-        );
-        tile.distanceToCamera = distance;
 
         // Determine initial LOD
         let lodLevel: "HIGH" | "LOW" | "ULTRA_LOW";
@@ -201,23 +231,20 @@ export const useOptimizedGrassInstances = ({
       });
 
       isCreatingGrassRef.current = false;
-      setMeshReady(true);
 
-      console.log(
-        `Grass system initialized: ${visibleTiles} visible tiles, ${culledTiles} culled tiles`
-      );
+      // Trigger re-render after mesh is ready
+      // Using requestAnimationFrame ensures React sees the state change properly
+      requestAnimationFrame(() => {
+        setMeshReady(true);
+        console.log(
+          `Grass system initialized: ${visibleTiles} visible tiles, ${culledTiles} culled tiles`
+        );
+      });
     } catch (error) {
       console.error("Error initializing grass system:", error);
       cleanup();
     }
-  }, [
-    grassScale,
-    getGroundHeight,
-    GRASS_LOD_DISTANCE,
-    GRASS_ULTRA_LOW_DISTANCE,
-    disableChunkRemoval,
-    enableFrustumCulling,
-  ]);
+  });
 
   // Optimized LOD updates with adaptive timing
   useFrame((state) => {

@@ -16,6 +16,7 @@ import { Map5 } from "./Map5";
 import { Map6 } from "./Map6";
 import { Map7 } from "./Map7";
 import { Map8 } from "./Map8";
+import { Map9 } from "./Map9";
 import { DeerController } from "./DeerController";
 import { DeerHerd } from "./DeerHerd";
 import { useLightsControls } from "./useLightsControls";
@@ -58,6 +59,10 @@ const maps = {
     scale: 1,
     position: [0, 0, 0],
   },
+  map9: {
+    scale: 1,
+    position: [0, 0, 0],
+  },
 };
 
 export const Experience = () => {
@@ -68,6 +73,11 @@ export const Experience = () => {
   ]);
   const [deerSpawnPosition, setDeerSpawnPosition] = useState([5, 1, 5]);
   const [isTerrainReady, setIsTerrainReady] = useState(false); // Track terrain readiness
+
+  // Debug: Log when isTerrainReady changes
+  useEffect(() => {
+    console.log(`🔍 isTerrainReady changed to: ${isTerrainReady}`);
+  }, [isTerrainReady]);
 
   // Track character position and velocity for dynamic effects
   const characterPositionVector = useRef(new THREE.Vector3());
@@ -121,22 +131,40 @@ export const Experience = () => {
     showTestSphere,
   } = useLightsControls();
 
-  // Callback when terrain is ready (for Map5)
+  // Callback when terrain is ready (for Map5 and Map8)
   const handleTerrainReady = useCallback(() => {
-    console.log("✅ Terrain ready, spawning character in 100ms...");
+    console.log(
+      "✅ Terrain ready callback triggered, spawning character in 200ms..."
+    );
+    console.trace("Call stack for terrain ready:");
     setTimeout(() => {
+      console.log("✅ Setting isTerrainReady to TRUE");
       setIsTerrainReady(true);
-    }, 100); // Small additional delay
+    }, 200); // Additional delay to ensure physics colliders are fully ready
   }, []);
+
+  // Track previous map to detect actual changes (initialize to null for first run)
+  const prevMapRef = useRef(null);
 
   // Calculate smart spawn positions when map changes
   useEffect(() => {
-    // Reset terrain ready state when map changes
-    setIsTerrainReady(false);
-    console.log(`🗺️ Map changed to: ${map}, terrain ready reset to false`);
+    // Only reset if map actually changed (allow first run when prevMapRef is null)
+    if (prevMapRef.current === null || prevMapRef.current !== map) {
+      console.log(
+        `🗺️ Map changed from ${prevMapRef.current} to ${map}, resetting terrain ready`
+      );
+      prevMapRef.current = map;
+      // Reset terrain ready state when map changes
+      setIsTerrainReady(false);
+    } else {
+      console.log(
+        `🔍 Map useEffect ran but map is still: ${map}, NOT resetting terrain ready`
+      );
+      return; // Exit early if map hasn't changed
+    }
 
-    // For Map5 and Map8, wait for terrain callback. For others, mark ready immediately
-    if (map !== "map5" && map !== "map8") {
+    // For Map5, Map8, and Map9, wait for terrain callback. For others, mark ready immediately
+    if (map !== "map5" && map !== "map8" && map !== "map9") {
       setIsTerrainReady(true);
     }
 
@@ -182,8 +210,17 @@ export const Experience = () => {
       setDeerSpawnPosition(deerPos);
     } else if (map === "map8") {
       // For Map8 (ProceduralTerrain3), procedural terrain with adjustable flatness
-      const characterPos = [0, 20, 0];
-      const deerPos = [5, 20, 5];
+      // Spawn higher to give terrain time to fully initialize physics colliders
+      const characterPos = [0, 50, 0];
+      const deerPos = [5, 50, 5];
+
+      setCharacterSpawnPosition(characterPos);
+      setDeerSpawnPosition(deerPos);
+    } else if (map === "map9") {
+      // For Map9 (ProceduralTerrain4 with Simplex Noise), BOTW-style terrain
+      // Spawn higher to give terrain time to fully initialize physics colliders
+      const characterPos = [0, 50, 0];
+      const deerPos = [5, 50, 5];
 
       setCharacterSpawnPosition(characterPos);
       setDeerSpawnPosition(deerPos);
@@ -283,8 +320,18 @@ export const Experience = () => {
           />
         ) : map === "map7" ? (
           <Map7 scale={maps[map].scale} position={maps[map].position} />
-        ) : (
+        ) : map === "map8" ? (
           <Map8
+            ref={terrainMeshRef}
+            scale={maps[map].scale}
+            position={maps[map].position}
+            characterPosition={characterPositionVector.current}
+            characterVelocity={characterVelocity.current}
+            onTerrainReady={handleTerrainReady}
+          />
+        ) : (
+          <Map9
+            ref={terrainMeshRef}
             scale={maps[map].scale}
             position={maps[map].position}
             characterPosition={characterPositionVector.current}
@@ -312,7 +359,10 @@ export const Experience = () => {
               position={deerSpawnPosition}
               terrainMesh={terrainMeshRef.current}
             />
-            <DeerHerd terrainMesh={terrainMeshRef.current} />
+            <DeerHerd
+              terrainMesh={terrainMeshRef.current}
+              spawnHeight={deerSpawnPosition[1]}
+            />
           </>
         )}
       </Physics>

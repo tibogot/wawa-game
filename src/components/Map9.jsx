@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback, useMemo, forwardRef } from "react";
 import * as THREE from "three";
-import { ProceduralTerrain3 } from "./ProceduralTerrain3";
+import { ProceduralTerrain4 } from "./ProceduralTerrain4";
 import { SimonDevGrass21 } from "./SimonDevGrass21/SimonDevGrass21";
 import { useSimonDevGrass21Controls } from "./useSimonDevGrass21Controls";
 import { HeightFog } from "./HeightFog";
@@ -11,7 +11,7 @@ import LensFlare from "./LensFlare";
 import { FlowingLinesSimple } from "./FlowingLinesSimple";
 import { useFlowingLinesControls } from "./useFlowingLinesControls";
 
-export const Map8 = forwardRef(
+export const Map9 = forwardRef(
   (
     {
       scale = 1,
@@ -64,14 +64,14 @@ export const Map8 = forwardRef(
     // Create stable fallback vectors
     const fallbackPosition = useMemo(() => new THREE.Vector3(0, 0, 0), []);
 
-    // Callback when ProceduralTerrain3 heightmap is ready
+    // Callback when ProceduralTerrain4 heightmap is ready
     const handleHeightmapReady = useCallback((fn) => {
-      console.log("✅ Map8 received heightmap lookup from ProceduralTerrain3");
+      console.log("✅ Map9 received heightmap lookup from ProceduralTerrain4 (Simplex)");
       setHeightmapLookup(() => fn);
       // Mark terrain mesh as ready after a short delay to ensure materials are compiled
       setTimeout(() => {
         setIsTerrainMeshReady(true);
-        console.log("✅ Map8 terrain mesh ready, HeightFog can now apply");
+        console.log("✅ Map9 terrain mesh ready, HeightFog can now apply");
       }, 100);
     }, []);
 
@@ -89,7 +89,7 @@ export const Map8 = forwardRef(
     return (
       <group ref={group} {...props}>
         <CloudSystem />
-        <ProceduralTerrain3
+        <ProceduralTerrain4
           onTerrainReady={onTerrainReady}
           onHeightmapReady={handleHeightmapReady}
         />
@@ -109,7 +109,7 @@ export const Map8 = forwardRef(
         {simonDevGrass21Enabled && heightmapLookup && (
           <SimonDevGrass21
             areaSize={200}
-            mapSize={2000}
+            mapSize={2500}
             grassHeight={1.0}
             grassScale={1.0}
             getGroundHeight={getGroundHeight}
@@ -175,3 +175,4 @@ export const Map8 = forwardRef(
     );
   }
 );
+

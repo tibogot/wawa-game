@@ -134,13 +134,28 @@ export const HeightFog: React.FC<HeightFogProps> = ({
             // Enable fog
             material.fog = true;
 
-            // Set custom onBeforeCompile to inject fogHeight uniform
-            material.onBeforeCompile = (shader) => {
-              shader.uniforms.fogHeight = { value: fogHeight };
+            // Chain onBeforeCompile instead of replacing it
+            // This preserves existing shader modifications (like grass materials)
+            const originalOnBeforeCompile = material.onBeforeCompile;
 
-              // Store the shader for later updates
-              (material as any).userData.shader = shader;
-            };
+            // Only set onBeforeCompile if it hasn't been set by us already
+            if (!(material as any).userData.heightFogApplied) {
+              material.onBeforeCompile = (shader, renderer) => {
+                // Call original onBeforeCompile first (preserves grass shader code, etc.)
+                if (originalOnBeforeCompile) {
+                  originalOnBeforeCompile(shader, renderer);
+                }
+
+                // Then add fogHeight uniform
+                shader.uniforms.fogHeight = { value: fogHeight };
+
+                // Store the shader for later updates
+                (material as any).userData.shader = shader;
+              };
+
+              // Mark this material as having fog applied to avoid reapplying
+              (material as any).userData.heightFogApplied = true;
+            }
 
             // Force recompilation
             material.needsUpdate = true;

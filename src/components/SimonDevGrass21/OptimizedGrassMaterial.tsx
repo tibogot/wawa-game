@@ -196,24 +196,36 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
       let combinedBeginVertexCode = `
         #include <begin_vertex>
         
-        // Billboarding: Make grass blades face the camera
-        vec3 camPos = inverse(viewMatrix)[3].xyz;
-        vec3 bladeWorldPos = instanceMatrix[3].xyz;
-        vec2 toCamera2D = normalize(camPos.xz - bladeWorldPos.xz);
-        float angleToCamera = atan(toCamera2D.y, toCamera2D.x);
+        // View-space thickening: Prevents grass from disappearing when viewed edge-on
+        // Much cheaper than billboarding (uses dot product instead of trig functions)
         
-        // Create rotation matrix for Y-axis rotation
-        mat3 billboardRot = mat3(
-          cos(angleToCamera), 0.0, sin(angleToCamera),
-          0.0, 1.0, 0.0,
-          -sin(angleToCamera), 0.0, cos(angleToCamera)
-        );
+        // Get instance world position
+        vec3 instanceWorldPos = vec3(instanceMatrix[3].xyz);
         
-        // Apply billboarding rotation to make grass face camera
-        transformed = billboardRot * transformed;
+        // Get camera position in world space (from view matrix inverse)
+        vec3 camPos = (inverse(viewMatrix) * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
         
-        // Apply the same transformations to normals for proper lighting
-        transformedNormal = billboardRot * transformedNormal;
+        // Get view direction from camera to instance (world space)
+        vec3 viewDir = normalize(camPos - instanceWorldPos);
+        
+        // Grass face normal is the X axis of the instance matrix (world space)
+        vec3 grassFaceNormal = normalize(vec3(instanceMatrix[0].xyz));
+        
+        // Calculate how edge-on we're viewing the grass (dot product in XZ plane)
+        float viewDotNormal = clamp(dot(normalize(grassFaceNormal.xz), normalize(viewDir.xz)), 0.0, 1.0);
+        
+        // Calculate thickening factor: high when edge-on (low dot), low when facing camera
+        float viewSpaceThickenFactor = pow(1.0 - viewDotNormal, 4.0);
+        
+        // Thin out again when perfectly orthogonal to avoid visual artifacts
+        viewSpaceThickenFactor *= smoothstep(0.0, 0.2, viewDotNormal);
+        
+        // Get X direction and width from original local position
+        float xDirection = position.x > 0.0 ? 1.0 : -1.0;
+        float grassWidth = abs(position.x);
+        
+        // Apply thickening by pushing vertices outward along X axis in local space
+        transformed.x += viewSpaceThickenFactor * xDirection * grassWidth * 0.3;
       `;
 
       // Add wind movement functions to common section if needed (exact copy from v20)

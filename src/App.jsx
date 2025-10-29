@@ -3,6 +3,7 @@ import { Canvas } from "@react-three/fiber";
 import { Experience } from "./components/Experience";
 import { GlobalWindProvider } from "./components/GlobalWindProvider";
 import { Perf } from "r3f-perf";
+import * as THREE from "three";
 
 const keyboardMap = [
   { name: "forward", keys: ["ArrowUp", "KeyW"] },
@@ -22,6 +23,11 @@ function App() {
       <Canvas
         shadows
         camera={{ position: [3, 3, 3], near: 0.1, fov: 40, far: 10000 }}
+        gl={{
+          outputColorSpace: THREE.SRGBColorSpace,
+          toneMapping: THREE.ACESFilmicToneMapping,
+          toneMappingExposure: 1.0,
+        }}
         style={{
           touchAction: "none",
         }}
