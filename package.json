@@ -17,6 +17,7 @@
     "@three.ez/instanced-mesh": "^0.3.9",
     "@three.ez/simplify-geometry": "^0.0.1",
     "@types/three": "^0.180.0",
+    "gltfjsx": "^6.5.3",
     "leva": "^0.10.0",
     "postprocessing": "^6.37.8",
     "react": "^19.2.0",

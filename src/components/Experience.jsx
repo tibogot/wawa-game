@@ -13,6 +13,9 @@ import { Map2 } from "./Map2";
 import { Map3 } from "./Map3";
 import { Map4 } from "./Map4";
 import { Map5 } from "./Map5";
+import { Map6 } from "./Map6";
+import { Map7 } from "./Map7";
+import { Map8 } from "./Map8";
 import { DeerController } from "./DeerController";
 import { DeerHerd } from "./DeerHerd";
 import { useLightsControls } from "./useLightsControls";
@@ -40,6 +43,18 @@ const maps = {
     position: [0, 0, 0],
   },
   map5: {
+    scale: 1,
+    position: [0, 0, 0],
+  },
+  map6: {
+    scale: 1,
+    position: [0, 0, 0],
+  },
+  map7: {
+    scale: 1,
+    position: [0, 0, 0],
+  },
+  map8: {
     scale: 1,
     position: [0, 0, 0],
   },
@@ -120,8 +135,8 @@ export const Experience = () => {
     setIsTerrainReady(false);
     console.log(`🗺️ Map changed to: ${map}, terrain ready reset to false`);
 
-    // For Map5, wait for terrain callback. For others, mark ready immediately
-    if (map !== "map5") {
+    // For Map5 and Map8, wait for terrain callback. For others, mark ready immediately
+    if (map !== "map5" && map !== "map8") {
       setIsTerrainReady(true);
     }
 
@@ -148,6 +163,27 @@ export const Experience = () => {
       // So spawn character at Y=2 (2 units above the center peak)
       const characterPos = [0, 2, 0];
       const deerPos = [5, 2, 5];
+
+      setCharacterSpawnPosition(characterPos);
+      setDeerSpawnPosition(deerPos);
+    } else if (map === "map6") {
+      // For Map6 (Zeldaterrain1), simple terrain with basic spawn
+      const characterPos = [0, 5, 0];
+      const deerPos = [5, 5, 5];
+
+      setCharacterSpawnPosition(characterPos);
+      setDeerSpawnPosition(deerPos);
+    } else if (map === "map7") {
+      // For Map7 (ProceduralTerrain2), simple procedural terrain
+      const characterPos = [0, 5, 0];
+      const deerPos = [5, 5, 5];
+
+      setCharacterSpawnPosition(characterPos);
+      setDeerSpawnPosition(deerPos);
+    } else if (map === "map8") {
+      // For Map8 (ProceduralTerrain3), procedural terrain with adjustable flatness
+      const characterPos = [0, 20, 0];
+      const deerPos = [5, 20, 5];
 
       setCharacterSpawnPosition(characterPos);
       setDeerSpawnPosition(deerPos);
@@ -229,9 +265,26 @@ export const Experience = () => {
           />
         ) : map === "map4" ? (
           <Map4 scale={maps[map].scale} position={maps[map].position} />
-        ) : (
+        ) : map === "map5" ? (
           <Map5
             ref={terrainMeshRef}
+            scale={maps[map].scale}
+            position={maps[map].position}
+            characterPosition={characterPositionVector.current}
+            characterVelocity={characterVelocity.current}
+            onTerrainReady={handleTerrainReady}
+          />
+        ) : map === "map6" ? (
+          <Map6
+            scale={maps[map].scale}
+            position={maps[map].position}
+            characterPosition={characterPositionVector.current}
+            characterVelocity={characterVelocity.current}
+          />
+        ) : map === "map7" ? (
+          <Map7 scale={maps[map].scale} position={maps[map].position} />
+        ) : (
+          <Map8
             scale={maps[map].scale}
             position={maps[map].position}
             characterPosition={characterPositionVector.current}

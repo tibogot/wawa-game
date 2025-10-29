@@ -213,8 +213,8 @@ function TerrainChunk({
         const c = x + 1 + (z + 1) * verticesPerSide;
         const d = x + 1 + z * verticesPerSide;
 
-        indices.push(a, b, d);
-        indices.push(b, c, d);
+        indices.push(a, d, b); // Reversed
+        indices.push(b, d, c); // Reversed
       }
     }
 
@@ -269,7 +269,7 @@ function TerrainChunk({
     return new THREE.MeshStandardMaterial({
       color: color,
       flatShading: false,
-      side: THREE.DoubleSide,
+      // side: THREE.DoubleSide,
       vertexColors: enableHeightGradient && !showColorDebug,
     });
   }, [lodLevel, showColorDebug, segmentsPerChunk, enableHeightGradient]);
@@ -293,7 +293,7 @@ function TerrainChunk({
 export const ProceduralTerrain = ({
   size = 2000,
   chunkSize = 500,
-  segments = 200,
+  segments = 512,
   heightScale = 75,
   seed = 18871,
   viewDistance = 1000,
@@ -340,7 +340,7 @@ export const ProceduralTerrain = ({
     terrainSegments: {
       value: segments,
       min: 20,
-      max: 200,
+      max: 1024,
       step: 10,
       label: "Detail Segments",
     },
@@ -370,7 +370,7 @@ export const ProceduralTerrain = ({
       label: "Enable View Distance Culling",
     },
     enableChunks: {
-      value: false,
+      value: true,
       label: "Enable Chunks",
     },
     enableLOD: {
