@@ -6,6 +6,7 @@ import { useOptimizedGrassGeometry } from "./OptimizedGrassGeometry";
 import { useOptimizedGrassMaterial } from "./OptimizedGrassMaterial";
 import { useGrassEffects } from "./GrassEffects";
 import { useOptimizedGrassInstances } from "./OptimizedGrassInstances";
+import { useSimonDevGrass22Controls } from "../useSimonDevGrass22Controls";
 
 export const SimonDevGrass22 = ({
   areaSize = 200,
@@ -21,6 +22,63 @@ export const SimonDevGrass22 = ({
   mapSize = 200, // Add map size parameter
 }) => {
   const [meshReady, setMeshReady] = useState<boolean>(false);
+  // Read all Leva controls for v22
+  const {
+    simonDevGrass22Enabled,
+    // geometry
+    grassHeight: ctrlGrassHeight,
+    grassScale: ctrlGrassScale,
+    // wind
+    enableWindMovement,
+    windStrength,
+    windSpeed,
+    windNoiseScale,
+    windNoiseSpeed,
+    windNoiseAmplitude,
+    // colors
+    enableBaseToTipGradient,
+    baseColor,
+    tipColor,
+    gradientShaping,
+    // normals/ao
+    enableNormalMap,
+    enableAmbientOcclusion,
+    grassDensity,
+    aoStrength,
+    aoHeightPower,
+    aoDebugMode,
+    // player
+    enablePlayerInteraction,
+    playerInteractionRadius,
+    playerInteractionStrength,
+    playerInteractionRepel,
+    // moon
+    enableMoonReflection,
+    moonIntensity,
+    moonColor,
+    moonDirectionX,
+    moonDirectionY,
+    moonDirectionZ,
+    // contact shadows
+    contactShadowIntensity,
+    contactShadowRadius,
+    contactShadowBias,
+    // sss
+    enableSSS,
+    sssIntensity,
+    sssPower,
+    sssScale,
+    sssColor,
+    // env map
+    enableEnvMap,
+    envMapIntensity,
+    roughnessBase,
+    roughnessTip,
+    fresnelPower,
+    roughnessIntensity,
+  } = useSimonDevGrass22Controls();
+
+  if (!simonDevGrass22Enabled) return null;
 
   // Load normal map texture
   const normalMapTexture = useMemo(() => {
@@ -52,7 +110,7 @@ export const SimonDevGrass22 = ({
     GRASS_LOD_DISTANCE,
     GRASS_ULTRA_LOW_DISTANCE,
   } = useOptimizedGrassGeometry({
-    grassHeight,
+    grassHeight: ctrlGrassHeight ?? grassHeight,
     useFloat16: true,
   });
 
@@ -60,58 +118,62 @@ export const SimonDevGrass22 = ({
   const { material: grassMaterial } = useOptimizedGrassMaterial({
     enableDebugShader: false,
     enableDebugVertex: false,
-    enableNormalMap: true,
+    enableNormalMap: enableNormalMap,
     normalMapTexture,
-    enableBaseToTipGradient: true,
-    baseColor: "#0d3303",
-    tipColor: "#80801a",
-    gradientShaping: 4.0,
+    enableBaseToTipGradient: enableBaseToTipGradient,
+    baseColor: baseColor,
+    tipColor: tipColor,
+    gradientShaping: gradientShaping,
     enableNormalBlending: false,
     terrainBlendStart: 10.0,
     terrainBlendEnd: 30.0,
-    enableAmbientOcclusion: true,
-    grassDensity: 1.0,
-    aoStrength: 0.1,
-    aoHeightPower: 1.0,
-    aoDebugMode: false,
-    enableWindMovement: true,
-    windStrength: 1.0,
-    windSpeed: 1.0,
-    grassHeight,
-    // Wind Noise Controls
-    windNoiseScale: 1.0,
-    windNoiseSpeed: 1.0,
-    windNoiseAmplitude: 1.0,
+    enableAmbientOcclusion: enableAmbientOcclusion,
+    grassDensity: grassDensity,
+    aoStrength: aoStrength,
+    aoHeightPower: aoHeightPower,
+    aoDebugMode: aoDebugMode,
+    enableWindMovement: enableWindMovement,
+    windStrength: windStrength,
+    windSpeed: windSpeed,
+    grassHeight: ctrlGrassHeight ?? grassHeight,
+    // Wind Noise Controls (driven by GlobalWindProvider at runtime)
+    windNoiseScale: windNoiseScale,
+    windNoiseSpeed: windNoiseSpeed,
+    windNoiseAmplitude: windNoiseAmplitude,
     // Player Interaction
-    enablePlayerInteraction: true,
-    playerInteractionRadius: 3.0,
-    playerInteractionStrength: 0.5,
-    playerInteractionRepel: true,
+    enablePlayerInteraction: enablePlayerInteraction,
+    playerInteractionRadius: playerInteractionRadius,
+    playerInteractionStrength: playerInteractionStrength,
+    playerInteractionRepel: playerInteractionRepel,
     characterPosition,
     // Moonlight controls (v22 addition)
-    disableMoonReflection: false,
-    moonIntensity: 2.0,
-    // Moon angled like v6 to show specular highlight
-    moonDirection: new THREE.Vector3(-1.0, 1.0, 0.5),
-    moonColor: "#ff0000",
+    enableMoonReflection: enableMoonReflection,
+    moonIntensity: moonIntensity,
+    // Moon direction from controls
+    moonDirection: new THREE.Vector3(
+      moonDirectionX,
+      moonDirectionY,
+      moonDirectionZ
+    ).normalize(),
+    moonColor: moonColor,
     // Contact Shadow controls (v22 addition)
-    contactShadowIntensity: 0.8,
-    contactShadowRadius: 2.0,
-    contactShadowBias: 0.1,
+    contactShadowIntensity: contactShadowIntensity,
+    contactShadowRadius: contactShadowRadius,
+    contactShadowBias: contactShadowBias,
     // Subsurface Scattering controls (v22 addition)
-    disableSSS: false,
-    sssIntensity: 0.8,
-    sssPower: 1.5,
-    sssScale: 2.0,
-    sssColor: "#8fbc8f",
+    enableSSS: enableSSS,
+    sssIntensity: sssIntensity,
+    sssPower: sssPower,
+    sssScale: sssScale,
+    sssColor: sssColor,
     // Environment Map controls (v22 addition)
-    enableEnvMap: false,
+    enableEnvMap: enableEnvMap,
     envMap: envMapTexture,
-    envMapIntensity: 1.0,
-    roughnessBase: 0.9,
-    roughnessTip: 0.1,
-    fresnelPower: 3.0,
-    roughnessIntensity: 1.0,
+    envMapIntensity: envMapIntensity,
+    roughnessBase: roughnessBase,
+    roughnessTip: roughnessTip,
+    fresnelPower: fresnelPower,
+    roughnessIntensity: roughnessIntensity,
   });
 
   // Create instances using the optimized instances component
@@ -120,7 +182,7 @@ export const SimonDevGrass22 = ({
     lowLOD,
     ultraLowLOD,
     grassMaterial,
-    grassScale,
+    grassScale: ctrlGrassScale ?? grassScale,
     useFloat16: true,
     getGroundHeight,
     setMeshReady,
@@ -137,12 +199,12 @@ export const SimonDevGrass22 = ({
   useGrassEffects({
     instancedMeshRef,
     enableDebugVertex: false,
-    enableWindMovement: true,
-    enablePlayerInteraction: true,
+    enableWindMovement: enableWindMovement,
+    enablePlayerInteraction: enablePlayerInteraction,
     characterPosition,
-    windNoiseScale: 1.0,
-    windNoiseSpeed: 1.0,
-    windNoiseAmplitude: 1.0,
+    windNoiseScale: windNoiseScale,
+    windNoiseSpeed: windNoiseSpeed,
+    windNoiseAmplitude: windNoiseAmplitude,
   });
 
   return meshReady && instancedMeshRef.current ? (

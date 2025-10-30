@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { useAdaptiveLODSystem } from "./AdaptiveLODSystem";
@@ -56,6 +56,19 @@ export const useOptimizedGrassInstances = ({
     mapSize: mapSize, // Pass map size for adaptive culling
     areaSize: 200, // Pass grass area size
   });
+
+  // If the material reference changes, update existing tile meshes to use it
+  useEffect(() => {
+    if (!instancedMeshRef.current) return;
+    const group = instancedMeshRef.current;
+    group.traverse((obj) => {
+      const mesh = obj as THREE.InstancedMesh;
+      if ((mesh as any).isInstancedMesh) {
+        (mesh as any).material = grassMaterial;
+        if ((mesh as any).material) (mesh as any).material.needsUpdate = true;
+      }
+    });
+  }, [grassMaterial]);
 
   // Configuration
   const config = {

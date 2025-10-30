@@ -1,6 +1,5 @@
 import { useMemo, useRef, useCallback } from "react";
 import * as THREE from "three";
-import { useGlobalWind } from "../GlobalWindProvider";
 
 // Material cache to avoid recreating materials
 const materialCache = new Map<string, THREE.MeshStandardMaterial>();
@@ -35,7 +34,7 @@ interface MaterialConfig {
   playerInteractionRepel: boolean;
   characterPosition: THREE.Vector3 | null;
   // Moon light controls
-  disableMoonReflection?: boolean;
+  enableMoonReflection?: boolean;
   moonIntensity?: number;
   moonDirection?: THREE.Vector3;
   moonColor?: string;
@@ -44,7 +43,7 @@ interface MaterialConfig {
   contactShadowRadius?: number;
   contactShadowBias?: number;
   // Subsurface Scattering controls (v22 addition)
-  disableSSS?: boolean;
+  enableSSS?: boolean;
   sssIntensity?: number;
   sssPower?: number;
   sssScale?: number;
@@ -60,9 +59,9 @@ interface MaterialConfig {
 }
 
 export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
-  const { windUniforms } = useGlobalWind();
   const uniformUpdateQueue = useRef<THREE.MeshStandardMaterial[]>([]);
   const lastUpdateTime = useRef(0);
+  const localTimeRef = useRef(0);
 
   // Create cache key for material
   const createCacheKey = useCallback((config: MaterialConfig): string => {
@@ -94,7 +93,7 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
       playerInteractionStrength: config.playerInteractionStrength,
       playerInteractionRepel: config.playerInteractionRepel,
       // Moon controls in cache key
-      disableMoonReflection: !!config.disableMoonReflection,
+      enableMoonReflection: !!config.enableMoonReflection,
       moonIntensity: config.moonIntensity ?? 1.0,
       moonDirection: config.moonDirection
         ? [
@@ -109,7 +108,7 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
       contactShadowRadius: config.contactShadowRadius ?? 2.0,
       contactShadowBias: config.contactShadowBias ?? 0.1,
       // SSS cache key
-      disableSSS: !!config.disableSSS,
+      enableSSS: !!config.enableSSS,
       sssIntensity: config.sssIntensity ?? 0.8,
       sssPower: config.sssPower ?? 1.5,
       sssScale: config.sssScale ?? 2.0,
@@ -127,8 +126,10 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
   // Batched uniform updates to reduce per-frame overhead
   const updateUniforms = useCallback(() => {
     const now = performance.now();
-    if (now - lastUpdateTime.current < 16) return; // 60fps max
+    const dt = lastUpdateTime.current === 0 ? 16 : now - lastUpdateTime.current;
+    if (dt < 16) return; // ~60fps max
     lastUpdateTime.current = now;
+    localTimeRef.current += dt / 1000;
 
     uniformUpdateQueue.current.forEach((material) => {
       if (material.userData.shader) {
@@ -136,7 +137,7 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
 
         // Update time uniform
         if (shader.uniforms.u_time) {
-          shader.uniforms.u_time.value = windUniforms.u_time.value;
+          shader.uniforms.u_time.value = localTimeRef.current;
         }
 
         // Update player position
@@ -149,21 +150,99 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
         }
 
         // Update wind uniforms
-        if (shader.uniforms.u_windNoiseScale) {
-          shader.uniforms.u_windNoiseScale.value =
-            windUniforms.u_windNoiseScale.value;
-        }
-        if (shader.uniforms.u_windNoiseSpeed) {
-          shader.uniforms.u_windNoiseSpeed.value =
-            windUniforms.u_windNoiseSpeed.value;
-        }
-        if (shader.uniforms.u_windNoiseAmplitude) {
+        if (shader.uniforms.u_windNoiseScale)
+          shader.uniforms.u_windNoiseScale.value = config.windNoiseScale;
+        if (shader.uniforms.u_windNoiseSpeed)
+          shader.uniforms.u_windNoiseSpeed.value = config.windNoiseSpeed;
+        if (shader.uniforms.u_windNoiseAmplitude)
           shader.uniforms.u_windNoiseAmplitude.value =
-            windUniforms.u_windNoiseAmplitude.value;
-        }
+            config.windNoiseAmplitude;
+
+        // Update live-config uniforms (v22 extras)
+        if (shader.uniforms.u_playerInteractionRadius)
+          shader.uniforms.u_playerInteractionRadius.value =
+            config.playerInteractionRadius;
+        if (shader.uniforms.u_playerInteractionStrength)
+          shader.uniforms.u_playerInteractionStrength.value =
+            config.playerInteractionStrength;
+        if (shader.uniforms.u_playerInteractionRepel)
+          shader.uniforms.u_playerInteractionRepel.value =
+            config.playerInteractionRepel;
+
+        // Wind enable/strength/speed as uniforms if present
+        if ((shader.uniforms as any).u_enableWindMovement)
+          (shader.uniforms as any).u_enableWindMovement.value =
+            config.enableWindMovement;
+        if ((shader.uniforms as any).u_windStrength)
+          (shader.uniforms as any).u_windStrength.value = config.windStrength;
+        if ((shader.uniforms as any).u_windSpeed)
+          (shader.uniforms as any).u_windSpeed.value = config.windSpeed;
+
+        // Moonlight
+        if ((shader.uniforms as any).u_enableMoonReflection)
+          (shader.uniforms as any).u_enableMoonReflection.value =
+            config.enableMoonReflection ?? false;
+        if ((shader.uniforms as any).u_moonIntensity)
+          (shader.uniforms as any).u_moonIntensity.value =
+            config.moonIntensity ?? 1.5;
+        if ((shader.uniforms as any).u_moonDirection && config.moonDirection)
+          (shader.uniforms as any).u_moonDirection.value.copy(
+            config.moonDirection
+          );
+        if ((shader.uniforms as any).u_moonColor)
+          (shader.uniforms as any).u_moonColor.value.set(
+            config.moonColor ?? "#9fc9ff"
+          );
+
+        // Contact shadows
+        if ((shader.uniforms as any).u_contactShadowIntensity)
+          (shader.uniforms as any).u_contactShadowIntensity.value =
+            config.contactShadowIntensity ?? 0.8;
+        if ((shader.uniforms as any).u_contactShadowRadius)
+          (shader.uniforms as any).u_contactShadowRadius.value =
+            config.contactShadowRadius ?? 2.0;
+        if ((shader.uniforms as any).u_contactShadowBias)
+          (shader.uniforms as any).u_contactShadowBias.value =
+            config.contactShadowBias ?? 0.1;
+
+        // SSS
+        if ((shader.uniforms as any).u_enableSSS)
+          (shader.uniforms as any).u_enableSSS.value =
+            config.enableSSS ?? false;
+        if ((shader.uniforms as any).u_sssIntensity)
+          (shader.uniforms as any).u_sssIntensity.value =
+            config.sssIntensity ?? 0.8;
+        if ((shader.uniforms as any).u_sssPower)
+          (shader.uniforms as any).u_sssPower.value = config.sssPower ?? 1.5;
+        if ((shader.uniforms as any).u_sssScale)
+          (shader.uniforms as any).u_sssScale.value = config.sssScale ?? 2.0;
+        if ((shader.uniforms as any).u_sssColor)
+          (shader.uniforms as any).u_sssColor.value.set(
+            config.sssColor ?? "#8fbc8f"
+          );
+
+        // Env map
+        if ((shader.uniforms as any).u_enableEnvMap)
+          (shader.uniforms as any).u_enableEnvMap.value =
+            config.enableEnvMap ?? false;
+        if ((shader.uniforms as any).u_envMapIntensity)
+          (shader.uniforms as any).u_envMapIntensity.value =
+            config.envMapIntensity ?? 1.0;
+        if ((shader.uniforms as any).u_roughnessBase)
+          (shader.uniforms as any).u_roughnessBase.value =
+            config.roughnessBase ?? 0.9;
+        if ((shader.uniforms as any).u_roughnessTip)
+          (shader.uniforms as any).u_roughnessTip.value =
+            config.roughnessTip ?? 0.1;
+        if ((shader.uniforms as any).u_fresnelPower)
+          (shader.uniforms as any).u_fresnelPower.value =
+            config.fresnelPower ?? 3.0;
+        if ((shader.uniforms as any).u_roughnessIntensity)
+          (shader.uniforms as any).u_roughnessIntensity.value =
+            config.roughnessIntensity ?? 1.0;
       }
     });
-  }, [config, windUniforms]);
+  }, [config]);
 
   // Register material for uniform updates
   const registerMaterial = useCallback(
@@ -210,7 +289,10 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
       shader.uniforms.u_resolution = {
         value: new THREE.Vector2(window.innerWidth, window.innerHeight),
       };
-      shader.uniforms.u_time = windUniforms.u_time;
+      shader.uniforms.u_time = { value: 0.0 };
+      shader.uniforms.u_enableWindMovement = {
+        value: config.enableWindMovement,
+      };
       shader.uniforms.u_playerPosition = {
         value: config.characterPosition
           ? config.characterPosition.clone()
@@ -232,8 +314,8 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
       };
 
       // Moon uniforms
-      shader.uniforms.u_disableMoonReflection = {
-        value: config.disableMoonReflection ?? false,
+      shader.uniforms.u_enableMoonReflection = {
+        value: config.enableMoonReflection ?? false,
       };
       shader.uniforms.u_moonIntensity = {
         value: config.moonIntensity ?? 1.5,
@@ -258,8 +340,8 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
       };
 
       // Subsurface Scattering uniforms
-      shader.uniforms.u_disableSSS = {
-        value: config.disableSSS ?? false,
+      shader.uniforms.u_enableSSS = {
+        value: config.enableSSS ?? false,
       };
       shader.uniforms.u_sssIntensity = {
         value: config.sssIntensity ?? 0.8,
@@ -360,6 +442,7 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
           #include <common>
           
           uniform float u_time;
+          uniform bool u_enableWindMovement;
           uniform float u_windNoiseScale;
           uniform float u_windNoiseSpeed;
           uniform float u_windNoiseAmplitude;
@@ -449,10 +532,8 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
           transformed = curveMat * transformed;
           transformedNormal = curveMat * transformedNormal;
           
-          // Apply wind movement - only if enabled and windInfluence attribute exists
-          if (${
-            config.enableWindMovement ? "true" : "false"
-          } && windInfluence > 0.0) {
+          // Apply wind movement - runtime gated by uniform
+          if (u_enableWindMovement && windInfluence > 0.0) {
             // Use world position for noise sampling - ensures consistent wind patterns across all tiles
             vec3 worldPos = instanceWorldPos;
             
@@ -636,7 +717,7 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
           uniform vec2 u_resolution;
           
           // Moonlight uniforms
-          uniform bool u_disableMoonReflection;
+          uniform bool u_enableMoonReflection;
           uniform float u_moonIntensity;
           uniform vec3 u_moonDirection;
           uniform vec3 u_moonColor;
@@ -647,7 +728,7 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
           uniform float u_contactShadowBias;
           
           // Subsurface Scattering uniforms
-          uniform bool u_disableSSS;
+          uniform bool u_enableSSS;
           uniform float u_sssIntensity;
           uniform float u_sssPower;
           uniform float u_sssScale;
@@ -751,16 +832,11 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
         );
       }
 
-      // Add varying for UV coordinates (needed for player interaction, normal map, and gradient)
-      if (
-        config.enablePlayerInteraction ||
-        config.enableNormalMap ||
-        config.enableBaseToTipGradient
-      ) {
-        // Add varying variable declaration to vertex shader
-        shader.vertexShader = shader.vertexShader.replace(
-          "#include <common>",
-          `
+      // Always add varyings for UV/world/thickness so features don't depend on specific toggles
+      // Add varying variable declaration to vertex shader
+      shader.vertexShader = shader.vertexShader.replace(
+        "#include <common>",
+        `
           #include <common>
           
           varying vec2 vUv;
@@ -769,12 +845,12 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
           varying vec3 vReflect;
           varying vec3 vViewDir;
           `
-        );
+      );
 
-        // Add varying variable declaration to fragment shader
-        shader.fragmentShader = shader.fragmentShader.replace(
-          "#include <common>",
-          `
+      // Add varying variable declaration to fragment shader
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <common>",
+        `
           #include <common>
           
         varying vec2 vUv;
@@ -783,12 +859,12 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
         varying vec3 vReflect;
         varying vec3 vViewDir;
           `
-        );
+      );
 
-        // Pass UV coordinates, world position, and thickness in vertex shader
-        shader.vertexShader = shader.vertexShader.replace(
-          "#include <begin_vertex>",
-          `
+      // Pass UV coordinates, world position, and thickness in vertex shader
+      shader.vertexShader = shader.vertexShader.replace(
+        "#include <begin_vertex>",
+        `
           #include <begin_vertex>
           
           vUv = uv;
@@ -803,8 +879,7 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
           vec3 worldNormal = normalize(mat3(modelMatrix) * normal);
           vReflect = reflect(-vViewDir, worldNormal);
           `
-        );
-      }
+      );
 
       // Inject moonlight and SSS after standard lighting where geometryNormal/viewDir exist
       // Match v6 approach: add to outgoingLight so it's always visible
@@ -812,7 +887,7 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
         "#include <lights_fragment_end>",
         `
         #include <lights_fragment_end>
-        if (u_moonIntensity > 0.0) {
+        if (u_enableMoonReflection && u_moonIntensity > 0.0) {
           vec3 Lm = normalize(u_moonDirection);
           vec3 Rm = reflect(-Lm, geometryNormal);
           float moonSpec = pow(max(dot(Rm, geometryViewDir), 0.0), 16.0);
@@ -823,7 +898,7 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
         
         // Subsurface Scattering - Enhanced for better visibility (v22)
         vec3 sssContribution = vec3(0.0);
-        if (!u_disableSSS) {
+        if (u_enableSSS) {
           vec3 lightDir = normalize(vec3(1.0, 1.0, 0.5));
           float backScatter = max(dot(-lightDir, geometryNormal), 0.0);
           float frontScatter = max(dot(lightDir, geometryNormal), 0.0);
@@ -872,7 +947,7 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
     registerMaterial(newMaterial);
 
     return newMaterial;
-  }, [config, createCacheKey, registerMaterial, windUniforms]);
+  }, [config, createCacheKey, registerMaterial]);
 
   return {
     material,

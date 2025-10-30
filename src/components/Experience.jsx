@@ -19,6 +19,8 @@ import { Map7 } from "./Map7";
 import { Map8 } from "./Map8";
 import { Map9 } from "./Map9";
 import { Map10 } from "./Map10";
+import { Map11 } from "./Map11";
+import { Map12 } from "./Map12";
 import { DeerController } from "./DeerController";
 import { DeerHerd } from "./DeerHerd";
 import { useLightsControls } from "./useLightsControls";
@@ -66,6 +68,14 @@ const maps = {
     position: [0, 0, 0],
   },
   map10: {
+    scale: 1,
+    position: [0, 0, 0],
+  },
+  map11: {
+    scale: 1,
+    position: [0, 0, 0],
+  },
+  map12: {
     scale: 1,
     position: [0, 0, 0],
   },
@@ -176,8 +186,15 @@ export const Experience = () => {
       return; // Exit early if map hasn't changed
     }
 
-    // For Map5, Map8, Map9, and Map10, wait for terrain callback. For others, mark ready immediately
-    if (map !== "map5" && map !== "map8" && map !== "map9" && map !== "map10") {
+    // For Map5, Map8, Map9, Map10, Map11, and Map12, wait for terrain callback. For others, mark ready immediately
+    if (
+      map !== "map5" &&
+      map !== "map8" &&
+      map !== "map9" &&
+      map !== "map10" &&
+      map !== "map11" &&
+      map !== "map12"
+    ) {
       setIsTerrainReady(true);
     }
 
@@ -241,6 +258,20 @@ export const Experience = () => {
       // For Map10 (ZeldaTerrainSmooth), centered peak at Y=0 similar to Map5
       const characterPos = [0, 2, 0];
       const deerPos = [5, 2, 5];
+
+      setCharacterSpawnPosition(characterPos);
+      setDeerSpawnPosition(deerPos);
+    } else if (map === "map11") {
+      // For Map11 (HeightMapTerrainSimon), spawn higher to give terrain time to initialize
+      const characterPos = [0, 50, 0];
+      const deerPos = [5, 50, 5];
+
+      setCharacterSpawnPosition(characterPos);
+      setDeerSpawnPosition(deerPos);
+    } else if (map === "map12") {
+      // For Map12 (ProceduralTerrain5), spawn higher to give terrain time to initialize
+      const characterPos = [0, 50, 0];
+      const deerPos = [5, 50, 5];
 
       setCharacterSpawnPosition(characterPos);
       setDeerSpawnPosition(deerPos);
@@ -420,8 +451,26 @@ export const Experience = () => {
             characterVelocity={characterVelocity.current}
             onTerrainReady={handleTerrainReady}
           />
-        ) : (
+        ) : map === "map10" ? (
           <Map10
+            ref={terrainMeshRef}
+            scale={maps[map].scale}
+            position={maps[map].position}
+            characterPosition={characterPositionVector.current}
+            characterVelocity={characterVelocity.current}
+            onTerrainReady={handleTerrainReady}
+          />
+        ) : map === "map11" ? (
+          <Map11
+            ref={terrainMeshRef}
+            scale={maps[map].scale}
+            position={maps[map].position}
+            characterPosition={characterPositionVector.current}
+            characterVelocity={characterVelocity.current}
+            onTerrainReady={handleTerrainReady}
+          />
+        ) : (
+          <Map12
             ref={terrainMeshRef}
             scale={maps[map].scale}
             position={maps[map].position}
