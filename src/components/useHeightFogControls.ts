@@ -4,7 +4,7 @@ export const useHeightFogControls = () => {
   return useControls("🌤️ AMBIENCE", {
     heightFog: folder(
       {
-        heightFogEnabled: { value: true, label: "🌫️ Enable Height Fog" },
+        heightFogEnabled: { value: false, label: "🌫️ Enable Height Fog" },
         fogColor: { value: "#cccccc", label: "Fog Color" },
         fogHeight: {
           value: 50.0,

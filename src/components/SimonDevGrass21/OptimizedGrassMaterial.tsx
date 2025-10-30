@@ -196,11 +196,14 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
       let combinedBeginVertexCode = `
         #include <begin_vertex>
         
+        // Calculate instance world position ONCE (transform from tile-local to world space)
+        // This is used by view-space thickening, wind, and player interaction
+        vec3 instanceLocalPos = vec3(instanceMatrix[3].xyz);
+        vec4 instancePosWorld = modelMatrix * vec4(instanceLocalPos, 1.0);
+        vec3 instanceWorldPos = instancePosWorld.xyz;
+        
         // View-space thickening: Prevents grass from disappearing when viewed edge-on
         // Much cheaper than billboarding (uses dot product instead of trig functions)
-        
-        // Get instance world position
-        vec3 instanceWorldPos = vec3(instanceMatrix[3].xyz);
         
         // Get camera position in world space (from view matrix inverse)
         vec3 camPos = (inverse(viewMatrix) * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
@@ -208,8 +211,9 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
         // Get view direction from camera to instance (world space)
         vec3 viewDir = normalize(camPos - instanceWorldPos);
         
-        // Grass face normal is the X axis of the instance matrix (world space)
-        vec3 grassFaceNormal = normalize(vec3(instanceMatrix[0].xyz));
+        // Grass face normal in world space (transform X axis from instance matrix)
+        vec3 grassFaceNormalLocal = normalize(vec3(instanceMatrix[0].xyz));
+        vec3 grassFaceNormal = normalize((modelMatrix * vec4(grassFaceNormalLocal, 0.0)).xyz);
         
         // Calculate how edge-on we're viewing the grass (dot product in XZ plane)
         float viewDotNormal = clamp(dot(normalize(grassFaceNormal.xz), normalize(viewDir.xz)), 0.0, 1.0);
@@ -311,9 +315,9 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
         combinedBeginVertexCode += `
           
           // SimonDev's initial curve system - applied BEFORE wind
-          // Generate per-blade hash for consistent randomness
-          vec3 instancePosition = vec3(instanceMatrix[3].xyz);
-          float perBladeHash = fract(sin(dot(instancePosition.xz, vec2(12.9898, 78.233))) * 43758.5453);
+          // Use instanceWorldPos (already calculated at the top) for consistent randomness and wind patterns
+          // Generate per-blade hash for consistent randomness (use world position for consistency across tiles)
+          float perBladeHash = fract(sin(dot(instanceWorldPos.xz, vec2(12.9898, 78.233))) * 43758.5453);
           
           // Generate random lean amount (-0.3 to 0.3)
           float randomLean = (perBladeHash - 0.5) * 0.6;
@@ -333,9 +337,8 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
           if (${
             config.enableWindMovement ? "true" : "false"
           } && windInfluence > 0.0) {
-            // Calculate world position for noise sampling - use instance position
-            vec3 instancePosition = vec3(instanceMatrix[3].xyz);
-            vec3 worldPos = instancePosition;
+            // Use world position for noise sampling - ensures consistent wind patterns across all tiles
+            vec3 worldPos = instanceWorldPos;
             
             // SimonDev's approach: Multiple noise samples for wind system
             
@@ -430,10 +433,8 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
           
           // PLAYER INTERACTION - Grass bends away from OR toward player!
           if (${config.enablePlayerInteraction ? "true" : "false"}) {
-            // For InstancedMesh, we need to get the instance position
-            // The instance position is available through the instanceMatrix
-            vec3 instancePosition = vec3(instanceMatrix[3].xyz);
-            vec3 grassBladePos = instancePosition;  // Current blade position in world space
+            // Use instanceWorldPos (already calculated at the top) - now in WORLD SPACE ✅
+            vec3 grassBladePos = instanceWorldPos;
             
             // Full 3D distance calculation
             float distToPlayer3D = distance(grassBladePos, u_playerPosition);

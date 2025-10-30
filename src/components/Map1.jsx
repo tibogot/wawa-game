@@ -4,9 +4,11 @@ import { useControls, folder } from "leva";
 import { DynamicLeaves as DynamicLeaves3 } from "./DynamicLeaves3";
 import { SimonDevGrass21 } from "./SimonDevGrass21/SimonDevGrass21";
 import { ImpostorForest } from "./ImpostorForest";
+import { LeafPileMountain } from "./LeafPileMountain";
 import { useDynamicLeaves3Controls } from "./useDynamicLeaves3Controls";
 import { useSimonDevGrass21Controls } from "./useSimonDevGrass21Controls";
 import { useImpostorForestControls } from "./useImpostorForestControls";
+import { useLeafPileMountainControls } from "./useLeafPileMountainControls";
 import { useLensFlareControls } from "./useLensFlareControls";
 import LensFlare from "./LensFlare";
 import { FlowingLinesSimple } from "./FlowingLinesSimple";
@@ -52,6 +54,20 @@ export const Map1 = ({
     lodMid,
     lodFar,
   } = useImpostorForestControls();
+
+  // Get LeafPileMountain controls
+  const {
+    leafPileMountainEnabled,
+    leafPileMountainCount,
+    leafPileMountainPileRadius,
+    leafPileMountainPileHeight,
+    leafPileMountainPositionX,
+    leafPileMountainPositionZ,
+    leafPileMountainInteractionRange,
+    leafPileMountainPushStrength,
+    leafPileMountainSwirlStrength,
+    leafPileMountainExplosionStrength,
+  } = useLeafPileMountainControls();
 
   // Get LensFlare controls
   const {
@@ -195,6 +211,23 @@ export const Map1 = ({
             />
           )}
         </>
+      )}
+
+      {/* Leaf Pile Mountain - Pile of leaves on the floor */}
+      {leafPileMountainEnabled && (
+        <LeafPileMountain
+          count={leafPileMountainCount}
+          pileRadius={leafPileMountainPileRadius}
+          pileHeight={leafPileMountainPileHeight}
+          position={[leafPileMountainPositionX, 0, leafPileMountainPositionZ]}
+          ybotPosition={characterPosition || fallbackPosition}
+          ybotVelocity={characterVelocity || fallbackVelocity}
+          getGroundHeight={getGroundHeight}
+          characterInteractionRange={leafPileMountainInteractionRange}
+          characterPushStrength={leafPileMountainPushStrength}
+          characterSwirlStrength={leafPileMountainSwirlStrength}
+          characterExplosionStrength={leafPileMountainExplosionStrength}
+        />
       )}
 
       {/* Flowing Lines - Simple CodePen version on flat terrain */}

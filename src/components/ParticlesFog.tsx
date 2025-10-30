@@ -14,6 +14,7 @@ interface ParticlesFogProps {
   enableFog?: boolean;
   useTexture?: boolean;
   volumetricLayers?: number;
+  getTerrainHeight?: (x: number, z: number) => number;
 }
 
 export const ParticlesFog: React.FC<ParticlesFogProps> = ({
@@ -26,6 +27,7 @@ export const ParticlesFog: React.FC<ParticlesFogProps> = ({
   enableFog: defaultEnableFog = false,
   useTexture: defaultUseTexture = true,
   volumetricLayers: defaultVolumetricLayers = 3,
+  getTerrainHeight,
 }) => {
   // Internal controls
   const {
@@ -238,9 +240,15 @@ export const ParticlesFog: React.FC<ParticlesFogProps> = ({
 
         // Random position in area with height bias (more particles near ground)
         const heightFactor = Math.pow(Math.random(), 2); // Bias towards lower heights
-        data.positions[i3] = (Math.random() - 0.5) * areaSize;
-        data.positions[i3 + 1] = heightFactor * height;
-        data.positions[i3 + 2] = (Math.random() - 0.5) * areaSize;
+        const x = (Math.random() - 0.5) * areaSize;
+        const z = (Math.random() - 0.5) * areaSize;
+        
+        data.positions[i3] = x;
+        // Use terrain height if available, otherwise use fixed height
+        data.positions[i3 + 1] = getTerrainHeight 
+          ? getTerrainHeight(x, z) + heightFactor * height
+          : heightFactor * height;
+        data.positions[i3 + 2] = z;
 
         // Random rotation
         data.rotations[i3] = Math.random() * Math.PI * 2;
@@ -266,7 +274,7 @@ export const ParticlesFog: React.FC<ParticlesFogProps> = ({
     }
 
     return layersData;
-  }, [density, areaSize, height, opacity, volumetricLayers]);
+  }, [density, areaSize, height, opacity, volumetricLayers, getTerrainHeight]);
 
   // Update fog particle positions and properties for each layer
   useFrame(() => {
@@ -295,9 +303,15 @@ export const ParticlesFog: React.FC<ParticlesFogProps> = ({
         if (fogData.ages[i] > fogData.maxAge) {
           fogData.ages[i] = 0;
           const heightFactor = Math.pow(Math.random(), 2);
-          fogData.positions[i3] = (Math.random() - 0.5) * areaSize;
-          fogData.positions[i3 + 1] = heightFactor * height;
-          fogData.positions[i3 + 2] = (Math.random() - 0.5) * areaSize;
+          const respawnX = (Math.random() - 0.5) * areaSize;
+          const respawnZ = (Math.random() - 0.5) * areaSize;
+          
+          fogData.positions[i3] = respawnX;
+          // Use terrain height if available
+          fogData.positions[i3 + 1] = getTerrainHeight 
+            ? getTerrainHeight(respawnX, respawnZ) + heightFactor * height
+            : heightFactor * height;
+          fogData.positions[i3 + 2] = respawnZ;
           fogData.velocities[i3] = (Math.random() - 0.5) * 0.005;
           fogData.velocities[i3 + 1] = (Math.random() - 0.5) * 0.002;
           fogData.velocities[i3 + 2] = (Math.random() - 0.5) * 0.005;

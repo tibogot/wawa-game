@@ -13,6 +13,7 @@ interface FloatingLeavesProps {
   gravity?: number;
   enableLeaves?: boolean;
   useTexture?: boolean;
+  getTerrainHeight?: (x: number, z: number) => number;
 }
 
 export const FloatingLeaves: React.FC<FloatingLeavesProps> = ({
@@ -24,6 +25,7 @@ export const FloatingLeaves: React.FC<FloatingLeavesProps> = ({
   gravity: defaultGravity = 0.002,
   enableLeaves: defaultEnableLeaves = false,
   useTexture: defaultUseTexture = true,
+  getTerrainHeight,
 }) => {
   // Internal controls
   const {
@@ -196,9 +198,15 @@ export const FloatingLeaves: React.FC<FloatingLeavesProps> = ({
       const i3 = i * 3;
 
       // Random position in area
-      data.positions[i3] = (Math.random() - 0.5) * areaSize;
-      data.positions[i3 + 1] = Math.random() * spawnHeight + 5;
-      data.positions[i3 + 2] = (Math.random() - 0.5) * areaSize;
+      const x = (Math.random() - 0.5) * areaSize;
+      const z = (Math.random() - 0.5) * areaSize;
+
+      data.positions[i3] = x;
+      // Use terrain height if available, otherwise use fixed height
+      data.positions[i3 + 1] = getTerrainHeight
+        ? getTerrainHeight(x, z) + Math.random() * spawnHeight + 5
+        : Math.random() * spawnHeight + 5;
+      data.positions[i3 + 2] = z;
 
       // Random rotation
       data.rotations[i3] = Math.random() * Math.PI * 2;
@@ -215,7 +223,7 @@ export const FloatingLeaves: React.FC<FloatingLeavesProps> = ({
     }
 
     return data;
-  }, [count, areaSize, spawnHeight]);
+  }, [count, areaSize, spawnHeight, getTerrainHeight]);
 
   // Update leaf positions and rotations
   useFrame(() => {
@@ -234,9 +242,16 @@ export const FloatingLeaves: React.FC<FloatingLeavesProps> = ({
       // Respawn if too old
       if (leafData.ages[i] > leafData.maxAge) {
         leafData.ages[i] = 0;
-        leafData.positions[i3] = (Math.random() - 0.5) * areaSize;
-        leafData.positions[i3 + 1] = spawnHeight;
-        leafData.positions[i3 + 2] = (Math.random() - 0.5) * areaSize;
+        const respawnX = (Math.random() - 0.5) * areaSize;
+        const respawnZ = (Math.random() - 0.5) * areaSize;
+        leafData.positions[i3] = respawnX;
+        // Use terrain height if available
+        leafData.positions[i3 + 1] = getTerrainHeight
+          ? getTerrainHeight(respawnX, respawnZ) +
+            spawnHeight +
+            Math.random() * 5
+          : spawnHeight;
+        leafData.positions[i3 + 2] = respawnZ;
         leafData.velocities[i3] = (Math.random() - 0.5) * 0.01;
         leafData.velocities[i3 + 1] = -Math.random() * 0.005;
         leafData.velocities[i3 + 2] = (Math.random() - 0.5) * 0.01;
@@ -281,6 +296,20 @@ export const FloatingLeaves: React.FC<FloatingLeavesProps> = ({
       leafData.positions[i3] += leafData.velocities[i3];
       leafData.positions[i3 + 1] += leafData.velocities[i3 + 1];
       leafData.positions[i3 + 2] += leafData.velocities[i3 + 2];
+
+      // Prevent leaves from falling below terrain
+      if (getTerrainHeight) {
+        const terrainHeight = getTerrainHeight(
+          leafData.positions[i3],
+          leafData.positions[i3 + 2]
+        );
+        if (leafData.positions[i3 + 1] < terrainHeight + 2) {
+          leafData.positions[i3 + 1] = terrainHeight + 2 + Math.random() * 2;
+          // Give it a small upward velocity
+          leafData.velocities[i3 + 1] =
+            Math.abs(leafData.velocities[i3 + 1]) * 0.5;
+        }
+      }
 
       // Update rotation
       leafData.rotations[i3] += leafData.velocities[i3] * 10;

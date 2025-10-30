@@ -203,6 +203,7 @@ export const Map3 = forwardRef<any, any>(
             heightMin={butterflyHeightMin}
             heightMax={butterflyHeightMax}
             spreadRadius={butterflySpreadRadius}
+            getTerrainHeight={heightmapLookup ? getTerrainHeight : undefined}
           />
         )}
         {/* Render both butterflies AND moths when "both" is selected */}
@@ -218,6 +219,7 @@ export const Map3 = forwardRef<any, any>(
               heightMin={butterflyHeightMin}
               heightMax={butterflyHeightMax}
               spreadRadius={butterflySpreadRadius}
+              getTerrainHeight={heightmapLookup ? getTerrainHeight : undefined}
             />
             <ButterflyParticles
               enabled={butterflyEnabled}
@@ -229,6 +231,7 @@ export const Map3 = forwardRef<any, any>(
               heightMin={butterflyHeightMin}
               heightMax={butterflyHeightMax}
               spreadRadius={butterflySpreadRadius}
+              getTerrainHeight={heightmapLookup ? getTerrainHeight : undefined}
             />
           </>
         )}
@@ -256,9 +259,13 @@ export const Map3 = forwardRef<any, any>(
           />
         )}
         {/* Particles Fog */}
-        <ParticlesFog />
+        {heightmapLookup && (
+          <ParticlesFog getTerrainHeight={getTerrainHeight} />
+        )}
         {/* Floating Leaves */}
-        <FloatingLeaves />
+        {heightmapLookup && (
+          <FloatingLeaves getTerrainHeight={getTerrainHeight} />
+        )}
         {/* Wind Flag */}
         {windFlagEnabled && (
           <WindFlag

@@ -9,31 +9,64 @@ import * as THREE from "three";
 interface FlowingLinesSimpleProps {
   enabled?: boolean;
   lineCount?: number;
+  lineLength?: number;
+  lineWidth?: number;
+  heightOffset?: number;
+  verticalWave?: number;
+  animationSpeed?: number;
+  pathRadius?: number;
+  pathFrequency?: number;
+  lineColor?: string;
+  lineOpacity?: number;
+  segments?: number;
+  boundaryRadius?: number;
   getTerrainHeight?: (x: number, z: number) => number;
 }
 
 export const FlowingLinesSimple: React.FC<FlowingLinesSimpleProps> = ({
   enabled = true,
   lineCount = 10,
+  lineLength = 10.0,
+  lineWidth = 5.0,
+  heightOffset = 5.0,
+  verticalWave = 0.04,
+  animationSpeed = 1.0,
+  pathRadius = 20.0,
+  pathFrequency = 5.0,
+  lineColor = "#ffffff",
+  lineOpacity = 1.0,
+  segments = 20,
+  boundaryRadius = 1000,
   getTerrainHeight,
 }) => {
   const groupRef = useRef<THREE.Group>(null);
   const linesRef = useRef<any[]>([]);
 
-  // Create gradient texture (exactly like CodePen)
+  // Create gradient texture with color support
   const texture = useMemo(() => {
     const canvas = document.createElement("canvas");
     canvas.width = 64;
     canvas.height = 8;
     const context = canvas.getContext("2d")!;
+
+    // Convert hex color to RGB
+    const hex = lineColor.replace("#", "");
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+
     const gradient = context.createLinearGradient(0, 0, 64, 0);
-    gradient.addColorStop(0.0, "rgba(255,255,255,0)");
-    gradient.addColorStop(0.5, "rgba(255,255,255,128)");
-    gradient.addColorStop(1.0, "rgba(255,255,255,0)");
+    const alpha = Math.round(lineOpacity * 255);
+    gradient.addColorStop(0.0, `rgba(${r},${g},${b},0)`);
+    gradient.addColorStop(0.5, `rgba(${r},${g},${b},${alpha})`);
+    gradient.addColorStop(1.0, `rgba(${r},${g},${b},0)`);
     context.fillStyle = gradient;
     context.fillRect(0, 0, 64, 8);
-    return new THREE.CanvasTexture(canvas);
-  }, []);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+    return tex;
+  }, [lineColor, lineOpacity]);
 
   // Create lines (exactly like CodePen)
   useEffect(() => {
@@ -51,8 +84,7 @@ export const FlowingLinesSimple: React.FC<FlowingLinesSimpleProps> = ({
     const lines: THREE.Mesh[] = [];
     for (let i = 0; i < lineCount; i++) {
       const line = new THREE.Mesh(
-        // Scale up geometry: 1x1 -> 10x5 for visibility on large terrain
-        new THREE.PlaneGeometry(10, 5, 20, 1),
+        new THREE.PlaneGeometry(lineLength, lineWidth, segments, 1),
         new THREE.MeshBasicMaterial({
           map: texture,
           side: THREE.DoubleSide,
@@ -69,6 +101,9 @@ export const FlowingLinesSimple: React.FC<FlowingLinesSimpleProps> = ({
       (line as any).rndb = Math.random();
       (line as any).rndc = Math.random();
       (line as any).rndd = Math.random();
+      // Store initial world position for terrain lookup
+      (line as any).worldX = (Math.random() - 0.5) * boundaryRadius * 2;
+      (line as any).worldZ = (Math.random() - 0.5) * boundaryRadius * 2;
 
       lines.push(line);
       groupRef.current.add(line);
@@ -76,13 +111,21 @@ export const FlowingLinesSimple: React.FC<FlowingLinesSimpleProps> = ({
 
     linesRef.current = lines;
     console.log(`✅ Created ${lines.length} lines`);
-  }, [enabled, lineCount, texture]);
+  }, [
+    enabled,
+    lineCount,
+    lineLength,
+    lineWidth,
+    segments,
+    texture,
+    boundaryRadius,
+  ]);
 
   // Animation loop (exactly like CodePen flowLine function)
   useFrame(({ clock }) => {
-    if (!enabled || linesRef.current.length === 0) return;
+    if (!enabled || linesRef.current.length === 0 || !getTerrainHeight) return;
 
-    const t = clock.getElapsedTime() * 1000; // Convert to milliseconds
+    const t = clock.getElapsedTime() * 1000 * animationSpeed; // Convert to milliseconds and apply speed
 
     for (const line of linesRef.current) {
       const time = t / 3000;
@@ -91,23 +134,39 @@ export const FlowingLinesSimple: React.FC<FlowingLinesSimpleProps> = ({
       const rndb = (line as any).rndb;
       const rndc = (line as any).rndc;
       const rndd = (line as any).rndd;
+      const baseX = (line as any).worldX;
+      const baseZ = (line as any).worldZ;
 
-      // Loop through all 42 vertices (21 * 2)
-      for (let i = 0; i < 42; i++) {
-        const vertTime = time + (i % 21) / 60;
-        // Scale up the movement area (4 -> 20) for larger terrain
-        const x = 20 * Math.sin(5 * rnda * vertTime + 6 * rndb);
-        const y = 20 * Math.cos(5 * rndc * vertTime + 6 * rndd);
+      const vertexCount = (segments + 1) * 2; // (segments + 1) vertices per row, 2 rows
+      const segmentsPerRow = segments + 1;
 
-        // Float at a fixed height instead of following terrain to avoid jitter
-        // The original CodePen had smooth terrain, but real heightmaps cause jumps
-        const fixedHeight = 5.0; // Float 5 units above ground
-        const z =
-          fixedHeight +
-          0.04 * (i > 20 ? 1 : -1) * Math.cos(((i % 21) - 10) / 8);
+      // Loop through all vertices
+      for (let i = 0; i < vertexCount; i++) {
+        const vertTime = time + (i % segmentsPerRow) / 60;
+        // Calculate position using pathRadius and pathFrequency
+        const localX =
+          pathRadius * Math.sin(pathFrequency * rnda * vertTime + 6 * rndb);
+        const localZ =
+          pathRadius * Math.cos(pathFrequency * rndc * vertTime + 6 * rndd);
 
-        // Set vertex position (note: x, z, -y to match CodePen orientation)
-        pos.setXYZ(i, x, z, -y);
+        // Calculate world position for terrain lookup
+        const worldX = baseX + localX;
+        const worldZ = baseZ + localZ;
+
+        // Get terrain height at this position
+        const terrainHeight = getTerrainHeight(worldX, worldZ);
+
+        // Calculate height with offset and vertical wave
+        const verticalWaveOffset =
+          verticalWave *
+          (i > segments ? 1 : -1) *
+          Math.cos(((i % segmentsPerRow) - segmentsPerRow / 2) / 8);
+        const y = terrainHeight + heightOffset + verticalWaveOffset;
+        const x = localX;
+        const z = localZ;
+
+        // Set vertex position (note: x, z, -y to match CodePen orientation, but we want y up)
+        pos.setXYZ(i, x, y, -z);
       }
 
       pos.needsUpdate = true;

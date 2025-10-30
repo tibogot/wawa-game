@@ -23,9 +23,9 @@ export const useMovingShadowPlanesControls = () => {
           label: "📏 Plane Size (Diameter)",
         },
         planeHeight: {
-          value: 7,
+          value: 30,
           min: 3,
-          max: 15,
+          max: 50,
           step: 0.5,
           label: "📍 Height Above Ground (6-8m = Natural)",
         },

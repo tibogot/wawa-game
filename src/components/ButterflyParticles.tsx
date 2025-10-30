@@ -195,6 +195,7 @@ interface ButterflyParticlesProps {
   heightMin?: number;
   heightMax?: number;
   spreadRadius?: number;
+  getTerrainHeight?: (x: number, z: number) => number;
 }
 
 export function ButterflyParticles({
@@ -207,6 +208,7 @@ export function ButterflyParticles({
   heightMin = 2.0,
   heightMax = 5.0,
   spreadRadius = 1.0,
+  getTerrainHeight,
 }: ButterflyParticlesProps) {
   const groupRef = useRef<THREE.Group>(null);
   const materialRef = useRef<THREE.ShaderMaterial | null>(null);
@@ -496,7 +498,12 @@ export function ButterflyParticles({
         if (!m) continue;
 
         m.position.copy(currentCell);
-        m.position.y = 0;
+        // Use terrain height if available, otherwise default to 0
+        if (getTerrainHeight) {
+          m.position.y = getTerrainHeight(currentCell.x, currentCell.z);
+        } else {
+          m.position.y = 0;
+        }
         m.visible = true;
       }
     }

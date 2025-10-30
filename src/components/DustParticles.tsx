@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import React, { useRef, useEffect } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 
@@ -128,6 +128,7 @@ interface DustParticlesProps {
   maxDistance?: number; // Maximum distance from camera to render
   dustSize?: [number, number]; // Size of each dust particle [width, height]
   enabled?: boolean; // Toggle on/off
+  getTerrainHeight?: (x: number, z: number) => number;
 }
 
 export function DustParticles({
@@ -136,6 +137,7 @@ export function DustParticles({
   maxDistance = 50.0,
   dustSize = [0.4, 0.4],
   enabled = true,
+  getTerrainHeight,
 }: DustParticlesProps) {
   const groupRef = useRef<THREE.Group>(null);
   const materialRef = useRef<THREE.ShaderMaterial | null>(null);
@@ -162,9 +164,15 @@ export function DustParticles({
     const randomOpacities = new Float32Array(count);
 
     for (let i = 0; i < count; i++) {
-      offsets[i * 3 + 0] = (Math.random() * 2.0 - 1.0) * (spawnRange / 2);
-      offsets[i * 3 + 1] = Math.random() * 1.0 + 2.0;
-      offsets[i * 3 + 2] = (Math.random() * 2.0 - 1.0) * (spawnRange / 2);
+      const x = (Math.random() * 2.0 - 1.0) * (spawnRange / 2);
+      const z = (Math.random() * 2.0 - 1.0) * (spawnRange / 2);
+
+      offsets[i * 3 + 0] = x;
+      // Use terrain height if available, otherwise use fixed height
+      offsets[i * 3 + 1] = getTerrainHeight
+        ? getTerrainHeight(x, z) + Math.random() * 1.0 + 2.0
+        : Math.random() * 1.0 + 2.0;
+      offsets[i * 3 + 2] = z;
 
       // Random size variation (0.5 to 1.5 multiplier)
       randomSizes[i] = Math.random() * 1.0 + 0.5;
@@ -245,9 +253,15 @@ export function DustParticles({
     const randomOpacities = new Float32Array(count);
 
     for (let i = 0; i < count; i++) {
-      offsets[i * 3 + 0] = (Math.random() * 2.0 - 1.0) * (spawnRange / 2);
-      offsets[i * 3 + 1] = Math.random() * 1.0 + 2.0;
-      offsets[i * 3 + 2] = (Math.random() * 2.0 - 1.0) * (spawnRange / 2);
+      const x = (Math.random() * 2.0 - 1.0) * (spawnRange / 2);
+      const z = (Math.random() * 2.0 - 1.0) * (spawnRange / 2);
+
+      offsets[i * 3 + 0] = x;
+      // Use terrain height if available, otherwise use fixed height
+      offsets[i * 3 + 1] = getTerrainHeight
+        ? getTerrainHeight(x, z) + Math.random() * 1.0 + 2.0
+        : Math.random() * 1.0 + 2.0;
+      offsets[i * 3 + 2] = z;
 
       randomSizes[i] = Math.random() * 1.0 + 0.5;
       randomOpacities[i] = Math.random() * 0.7 + 0.3;
@@ -270,7 +284,7 @@ export function DustParticles({
       new THREE.Vector3(0, 0, 0),
       spawnRange
     );
-  }, [count, spawnRange]);
+  }, [count, spawnRange, getTerrainHeight]);
 
   // Create mesh for each cell
   const createMesh = () => {

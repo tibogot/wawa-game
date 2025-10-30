@@ -5,7 +5,8 @@ import {
 } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
 import { useControls, folder } from "leva";
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useEffect, useCallback, useMemo } from "react";
+import { useFrame } from "@react-three/fiber";
 import { GodotCharacterHybrid } from "./GodotCharacterHybrid";
 import * as THREE from "three";
 import { Map1 } from "./Map1";
@@ -66,7 +67,7 @@ const maps = {
 };
 
 export const Experience = () => {
-  const shadowCameraRef = useRef();
+  const directionalLightRef = useRef();
   const terrainMeshRef = useRef(null);
   const [characterSpawnPosition, setCharacterSpawnPosition] = useState([
     0, 10, 0,
@@ -116,7 +117,7 @@ export const Experience = () => {
     envBackgroundIntensity,
     ambientIntensity,
     directionalIntensity,
-    directionalPosition,
+    directionalPosition: defaultDirectionalPosition,
     directionalColor,
     shadowMapSize,
     shadowBias,
@@ -128,8 +129,15 @@ export const Experience = () => {
     shadowCameraBottom,
     shadowCameraNear,
     shadowCameraFar,
+    followCharacter,
     showTestSphere,
   } = useLightsControls();
+
+  // Override directional position for Map9 - memoized for stable reference
+  const directionalPosition = useMemo(
+    () => (map === "map9" ? [-15, 80, 15] : defaultDirectionalPosition),
+    [map, defaultDirectionalPosition]
+  );
 
   // Callback when terrain is ready (for Map5 and Map8)
   const handleTerrainReady = useCallback(() => {
@@ -231,6 +239,68 @@ export const Experience = () => {
     }
   }, [map]);
 
+  // Update shadow camera position to follow character when enabled
+  useFrame(() => {
+    if (followCharacter && directionalLightRef.current && isTerrainReady) {
+      const light = directionalLightRef.current;
+
+      // Access shadow camera from light's shadow object
+      if (!light.shadow || !light.shadow.camera) return;
+
+      const shadowCamera = light.shadow.camera;
+      const charPos = characterPositionVector.current;
+
+      // Calculate light direction (normalized direction from light position)
+      const lightDir = new THREE.Vector3(...directionalPosition).normalize();
+
+      // For directional light shadows, position camera above character in light direction
+      // The camera should be far enough to see the character + tight bounds area
+      const cameraHeight = 50; // Height above character
+      const lightReversed = lightDir.clone().multiplyScalar(-1); // Reverse direction
+
+      shadowCamera.position.set(
+        charPos.x + lightReversed.x * cameraHeight,
+        charPos.y + lightReversed.y * cameraHeight + cameraHeight,
+        charPos.z + lightReversed.z * cameraHeight
+      );
+
+      // Point camera at character
+      shadowCamera.lookAt(charPos.x, charPos.y, charPos.z);
+
+      // Update light target (important for directional light shadows)
+      if (light.target) {
+        light.target.position.set(charPos.x, charPos.y, charPos.z);
+        light.target.updateMatrixWorld();
+      }
+
+      // Reduce frustum bounds for high-quality shadows (smaller = sharper)
+      const tightBounds = 15;
+      shadowCamera.left = -tightBounds;
+      shadowCamera.right = tightBounds;
+      shadowCamera.top = tightBounds;
+      shadowCamera.bottom = -tightBounds;
+
+      // Update matrices and force shadow update
+      shadowCamera.updateProjectionMatrix();
+      shadowCamera.updateMatrixWorld();
+      light.shadow.needsUpdate = true;
+      light.shadow.updateMatrices(light);
+    } else if (!followCharacter && directionalLightRef.current) {
+      // Restore original bounds when not following
+      const light = directionalLightRef.current;
+      if (light.shadow && light.shadow.camera) {
+        const shadowCamera = light.shadow.camera;
+        shadowCamera.left = shadowCameraLeft;
+        shadowCamera.right = shadowCameraRight;
+        shadowCamera.top = shadowCameraTop;
+        shadowCamera.bottom = shadowCameraBottom;
+        shadowCamera.updateProjectionMatrix();
+        light.shadow.needsUpdate = true;
+        light.shadow.updateMatrices(light);
+      }
+    }
+  });
+
   return (
     <>
       {cameraMode === "orbit" && (
@@ -261,6 +331,7 @@ export const Experience = () => {
       )}
       <ambientLight intensity={ambientIntensity} />
       <directionalLight
+        ref={directionalLightRef}
         intensity={directionalIntensity}
         color={directionalColor}
         castShadow
@@ -278,7 +349,6 @@ export const Experience = () => {
           bottom={shadowCameraBottom}
           near={shadowCameraNear}
           far={shadowCameraFar}
-          ref={shadowCameraRef}
           attach={"shadow-camera"}
         />
       </directionalLight>

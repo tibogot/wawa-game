@@ -684,7 +684,7 @@ export const ProceduralTerrain4 = ({
       label: "🌾 Grass Color (Mid/Gentle)",
     },
     mountainColor: {
-      value: "#6b5d4f", // Brown-gray for mountains
+      value: "#4a7c3a", // Brown-gray for mountains
       label: "⛰️ Mountain Color (High/Gentle)",
     },
     peakColor: {
@@ -692,7 +692,7 @@ export const ProceduralTerrain4 = ({
       label: "🏔️ Peak Color (Highest)",
     },
     cliffColor: {
-      value: "#5a5248", // Dark brown-gray for cliffs
+      value: "#65523a", // Dark brown-gray for cliffs
       label: "🪨 Cliff Color (Steep)",
     },
     slopeThreshold: {
@@ -738,7 +738,7 @@ export const ProceduralTerrain4 = ({
       label: "🏞️ Valley Depth",
     },
     detailAmount: {
-      value: 0.18,
+      value: 0.06,
       min: 0,
       max: 0.5,
       step: 0.01,

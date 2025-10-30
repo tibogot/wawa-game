@@ -113,6 +113,10 @@ export const useLightsControls = () => {
           step: 1,
           label: "Shadow Blur Radius",
         },
+        followCharacter: {
+          value: false,
+          label: "Follow Character",
+        },
       },
       { collapsed: true }
     ),
