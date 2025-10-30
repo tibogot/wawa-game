@@ -18,6 +18,7 @@ import { Map6 } from "./Map6";
 import { Map7 } from "./Map7";
 import { Map8 } from "./Map8";
 import { Map9 } from "./Map9";
+import { Map10 } from "./Map10";
 import { DeerController } from "./DeerController";
 import { DeerHerd } from "./DeerHerd";
 import { useLightsControls } from "./useLightsControls";
@@ -61,6 +62,10 @@ const maps = {
     position: [0, 0, 0],
   },
   map9: {
+    scale: 1,
+    position: [0, 0, 0],
+  },
+  map10: {
     scale: 1,
     position: [0, 0, 0],
   },
@@ -171,8 +176,8 @@ export const Experience = () => {
       return; // Exit early if map hasn't changed
     }
 
-    // For Map5, Map8, and Map9, wait for terrain callback. For others, mark ready immediately
-    if (map !== "map5" && map !== "map8" && map !== "map9") {
+    // For Map5, Map8, Map9, and Map10, wait for terrain callback. For others, mark ready immediately
+    if (map !== "map5" && map !== "map8" && map !== "map9" && map !== "map10") {
       setIsTerrainReady(true);
     }
 
@@ -229,6 +234,13 @@ export const Experience = () => {
       // Spawn higher to give terrain time to fully initialize physics colliders
       const characterPos = [0, 50, 0];
       const deerPos = [5, 50, 5];
+
+      setCharacterSpawnPosition(characterPos);
+      setDeerSpawnPosition(deerPos);
+    } else if (map === "map10") {
+      // For Map10 (ZeldaTerrainSmooth), centered peak at Y=0 similar to Map5
+      const characterPos = [0, 2, 0];
+      const deerPos = [5, 2, 5];
 
       setCharacterSpawnPosition(characterPos);
       setDeerSpawnPosition(deerPos);
@@ -399,8 +411,17 @@ export const Experience = () => {
             characterVelocity={characterVelocity.current}
             onTerrainReady={handleTerrainReady}
           />
-        ) : (
+        ) : map === "map9" ? (
           <Map9
+            ref={terrainMeshRef}
+            scale={maps[map].scale}
+            position={maps[map].position}
+            characterPosition={characterPositionVector.current}
+            characterVelocity={characterVelocity.current}
+            onTerrainReady={handleTerrainReady}
+          />
+        ) : (
+          <Map10
             ref={terrainMeshRef}
             scale={maps[map].scale}
             position={maps[map].position}

@@ -3,10 +3,12 @@ import { useRef, useMemo } from "react";
 import { useControls, folder } from "leva";
 import { DynamicLeaves as DynamicLeaves3 } from "./DynamicLeaves3";
 import { SimonDevGrass21 } from "./SimonDevGrass21/SimonDevGrass21";
+import { SimonDevGrass22 } from "./SimonDevGrass22/SimonDevGrass22";
 import { ImpostorForest } from "./ImpostorForest";
 import { LeafPileMountain } from "./LeafPileMountain";
 import { useDynamicLeaves3Controls } from "./useDynamicLeaves3Controls";
 import { useSimonDevGrass21Controls } from "./useSimonDevGrass21Controls";
+import { useSimonDevGrass22Controls } from "./useSimonDevGrass22Controls";
 import { useImpostorForestControls } from "./useImpostorForestControls";
 import { useLeafPileMountainControls } from "./useLeafPileMountainControls";
 import { useLensFlareControls } from "./useLensFlareControls";
@@ -41,6 +43,8 @@ export const Map1 = ({
 
   // Get SimonDevGrass21 controls
   const { simonDevGrass21Enabled } = useSimonDevGrass21Controls();
+  // Get SimonDevGrass22 controls (separate folder under FOLIAGE)
+  const { simonDevGrass22Enabled } = useSimonDevGrass22Controls();
 
   // Get ImpostorForest controls
   const {
@@ -141,9 +145,21 @@ export const Map1 = ({
           characterSwirlStrength={dynamicLeaves3SwirlStrength}
         />
       )}
-      {/* SimonDevGrass21 Grass System - Perfect for flat plane debugging! */}
+      {/* SimonDevGrass21 Grass System */}
       {simonDevGrass21Enabled && (
         <SimonDevGrass21
+          areaSize={200}
+          mapSize={200}
+          grassHeight={1.0}
+          grassScale={1.0}
+          getGroundHeight={getGroundHeight}
+          characterPosition={characterPosition || fallbackPosition}
+        />
+      )}
+
+      {/* SimonDevGrass22 Grass System */}
+      {simonDevGrass22Enabled && (
+        <SimonDevGrass22
           areaSize={200}
           mapSize={200}
           grassHeight={1.0}

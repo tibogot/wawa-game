@@ -28,6 +28,8 @@ import { useDynamicLeaves3Controls } from "./useDynamicLeaves3Controls";
 import { RainParticles3D } from "./RainParticles3D";
 import { useRainParticles3DControls } from "./useRainParticles3DControls";
 import { ParticlesFog } from "./ParticlesFog";
+import { ShorelineEffect } from "./ShorelineEffect";
+import { useShorelineEffectControls } from "./useShorelineEffectControls";
 
 export const Map9 = forwardRef(
   (
@@ -190,6 +192,21 @@ export const Map9 = forwardRef(
       rainColor,
       rainOpacity,
     } = useRainParticles3DControls();
+
+    // Get ShorelineEffect controls
+    const {
+      enabled: shorelineEnabled,
+      shorelineIntensity,
+      shorelineWidth,
+      shorelineColor1,
+      shorelineColor2,
+      waveSpeed,
+      waveAmplitude,
+      noiseScale,
+      gradientSharpness,
+      waterLevel,
+      debugMode,
+    } = useShorelineEffectControls();
 
     // Create stable fallback vectors
     const fallbackPosition = useMemo(() => new THREE.Vector3(0, 0, 0), []);
@@ -480,6 +497,23 @@ export const Map9 = forwardRef(
           mountainEmissive={mountainEmissive}
           mountainEmissiveIntensity={mountainEmissiveIntensity}
         />
+        {/* Shoreline Effect */}
+        {heightmapLookup && (
+          <ShorelineEffect
+            terrainSize={2500}
+            waterLevel={waterLevel}
+            enableShoreline={shorelineEnabled}
+            shorelineIntensity={shorelineIntensity}
+            shorelineWidth={shorelineWidth}
+            shorelineColor1={shorelineColor1}
+            shorelineColor2={shorelineColor2}
+            waveSpeed={waveSpeed}
+            waveAmplitude={waveAmplitude}
+            noiseScale={noiseScale}
+            gradientSharpness={gradientSharpness}
+            debugMode={debugMode}
+          />
+        )}
       </group>
     );
   }
