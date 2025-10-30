@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useRef, useEffect } from "react";
 import * as THREE from "three";
+import { useControls, folder } from "leva";
 
 // Wind calculation service
 class WindCalculationService {
@@ -10,9 +11,8 @@ class WindCalculationService {
 
   // Simple noise function for wind (same as in GrassMaterial)
   private noise(p: THREE.Vector2): number {
-    return Math.fract(
-      Math.sin(p.dot(new THREE.Vector2(12.9898, 78.233))) * 43758.5453
-    );
+    const n = Math.sin(p.dot(new THREE.Vector2(12.9898, 78.233))) * 43758.5453;
+    return n - Math.floor(n);
   }
 
   // Smooth noise function (same as in GrassMaterial)
@@ -121,6 +121,18 @@ export const GlobalWindProvider: React.FC<{ children: React.ReactNode }> = ({
     u_windNoiseAmplitude: { value: 1.0 },
   });
 
+  // Leva controls for global wind parameters
+  const { windNoiseScale, windNoiseSpeed, windNoiseAmplitude } = useControls({
+    Wind: folder(
+      {
+        windNoiseScale: { value: 1.0, min: 0.0, max: 5.0, step: 0.01 },
+        windNoiseSpeed: { value: 1.0, min: 0.0, max: 5.0, step: 0.01 },
+        windNoiseAmplitude: { value: 1.0, min: 0.0, max: 5.0, step: 0.01 },
+      },
+      { collapsed: false }
+    ),
+  });
+
   // Animation loop
   useEffect(() => {
     let animationId: number;
@@ -148,6 +160,11 @@ export const GlobalWindProvider: React.FC<{ children: React.ReactNode }> = ({
     windUniformsRef.current.u_windNoiseSpeed.value = speed;
     windUniformsRef.current.u_windNoiseAmplitude.value = amplitude;
   };
+
+  // Apply control changes to global wind immediately
+  useEffect(() => {
+    updateWind(windNoiseScale, windNoiseSpeed, windNoiseAmplitude);
+  }, [windNoiseScale, windNoiseSpeed, windNoiseAmplitude]);
 
   const contextValue: WindContextType = {
     windService: windServiceRef.current,

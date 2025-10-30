@@ -14,6 +14,8 @@ import { useLeafPileMountainControls } from "./useLeafPileMountainControls";
 import { useLensFlareControls } from "./useLensFlareControls";
 import LensFlare from "./LensFlare";
 import { FlowingLinesSimple } from "./FlowingLinesSimple";
+import { WindFlag } from "./WindFlag";
+import { useWindFlagControls } from "./useWindFlagControls";
 import * as THREE from "three";
 
 export const Map1 = ({
@@ -114,6 +116,23 @@ export const Map1 = ({
   const fallbackPosition = useMemo(() => new THREE.Vector3(0, 0, 0), []);
   const fallbackVelocity = useMemo(() => new THREE.Vector3(0, 0, 0), []);
 
+  // WindFlag controls (reuse shared hook used by other maps)
+  const {
+    windFlagEnabled,
+    windFlagPosition,
+    windFlagYOffset,
+    windFlagScale,
+    windFlagColor,
+    windFlagPoleHeight,
+    windFlagWidth,
+    windFlagHeight,
+    windFlagSegments,
+    windFlagUseTexture,
+    windFlagTexturePath,
+    windFlagTextureQuality,
+    windFlagWaveIntensity,
+  } = useWindFlagControls();
+
   return (
     <group ref={group} {...props}>
       <RigidBody type="fixed" colliders="trimesh">
@@ -132,6 +151,26 @@ export const Map1 = ({
           />
         </mesh>
       </RigidBody>
+      {/* WindFlag to visualize global wind */}
+      {windFlagEnabled && (
+        <WindFlag
+          position={[
+            windFlagPosition[0],
+            -windFlagPoleHeight / 2 + windFlagYOffset,
+            windFlagPosition[1],
+          ]}
+          scale={windFlagScale}
+          flagColor={windFlagColor}
+          poleHeight={windFlagPoleHeight}
+          flagWidth={windFlagWidth}
+          flagHeight={windFlagHeight}
+          segments={windFlagSegments}
+          useTexture={windFlagUseTexture}
+          texturePath={windFlagTexturePath}
+          textureQuality={windFlagTextureQuality}
+          waveIntensity={windFlagWaveIntensity}
+        />
+      )}
       {/* Dynamic Leaves v3 */}
       {dynamicLeaves3Enabled && (
         <DynamicLeaves3
