@@ -29,7 +29,7 @@ export const useSimonDevGrass22Controls = () => {
         // Wind
         wind: folder(
           {
-            enableWindMovement: { value: true, label: "🍃 Enable Wind" },
+            enableWindMovement: { value: false, label: "🍃 Enable Wind" },
             windStrength: {
               value: 1.0,
               min: 0.0,

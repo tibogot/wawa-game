@@ -493,7 +493,7 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
         float grassWidth = abs(position.x);
         
         // Apply thickening by pushing vertices outward along X axis in local space
-        transformed.x += viewSpaceThickenFactor * xDirection * grassWidth * 0.3;
+        transformed.x += viewSpaceThickenFactor * xDirection * grassWidth * 0.8;
       `;
 
       // Always add wind functions (runtime-gated) and player interaction helpers
@@ -589,14 +589,9 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
         // Generate random lean amount (-0.3 to 0.3)
         float randomLean = (perBladeHash - 0.5) * 0.6;
         
-        // Apply initial curve based on vertex height (stronger at tips)
-        float heightPercent = transformed.y / ${config.grassHeight.toFixed(1)};
-        float curveAmount = randomLean * heightPercent;
-        
-        // Apply curve rotation around X-axis (forward/backward bend)
-        mat3 curveMat = rotateX(curveAmount);
-        transformed = curveMat * transformed;
-        transformedNormal = curveMat * transformedNormal;
+        // Apply subtle curved variation to break uniformity (Ghost of Tsushima style)
+        float curve = pow(uv.y, 2.0) * randomLean * 0.1;
+        transformed.x += curve;
         
         // Apply wind movement - runtime gated by uniform (works regardless of normal map)
         if (u_enableWindMovement && windInfluence > 0.0) {
@@ -716,13 +711,18 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
               }
               
               // Apply rotation - grass bends! 🏃🌿
-              // Convert to local space for rotation
-              vec3 localPos = transformed;
-              vec3 rotatedPos = rotateAxis(playerLeanAxis, playerLeanAngle) * localPos;
-              transformed = rotatedPos;
+              // Rotate around the blade BASE (Y=0) - same as wind
+              vec3 basePoint = vec3(0.0, 0.0, 0.0); // Blade base
+              vec3 offsetFromBase = transformed - basePoint;
+              
+              // Apply rotation around the base
+              offsetFromBase = rotateAxis(playerLeanAxis, playerLeanAngle) * offsetFromBase;
               
               // Apply the same rotation to normals for proper lighting
               transformedNormal = rotateAxis(playerLeanAxis, playerLeanAngle) * transformedNormal;
+              
+              // Move back to final position
+              transformed = basePoint + offsetFromBase;
             }
           }
         `;
@@ -742,15 +742,15 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
           `
           #include <normal_fragment>
           
-          // Sample normal map for blue gradient effect
+          // Sample normal map for rounded normals (Ghost of Tsushima technique)
           vec4 normalMapColor = texture2D(normalMap, vUv);
           
-          // Extract blue channel (Z-axis normal) for thickness
-          float blueNormal = normalMapColor.b * 2.0 - 1.0; // Convert from 0-1 to -1 to 1
+          // Extract normal from RGB channels - Ghost of Tsushima gradient normal map
+          // The normal map encodes rounded cross-section gradient for blade thickness
+          vec3 tangentNormal = normalMapColor.rgb * 2.0 - 1.0; // Convert from 0-1 to -1 to 1
           
-          // Create rounded normal effect
-          vec3 roundedNormal = normalize(normal + vec3(0.0, 0.0, blueNormal * 0.5));
-          normal = roundedNormal;
+          // Apply to base normal - creates rounded cross-section effect
+          normal = normalize(normal + tangentNormal * 0.5);
           `
         );
       }

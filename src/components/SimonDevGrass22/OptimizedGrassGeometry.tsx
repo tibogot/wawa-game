@@ -106,9 +106,9 @@ export const useOptimizedGrassGeometry = ({
   useFloat16?: boolean;
 }) => {
   return useMemo(() => {
-    // Create shared geometries
-    const highLOD = createGrassGeometry(grassHeight, 5, useFloat16);
-    const lowLOD = createGrassGeometry(grassHeight, 2, useFloat16);
+    // Create shared geometries - SimonDev's Ghost of Tsushima approach: 15 vertices for HIGH, 6 for LOW/ULTRA_LOW
+    const highLOD = createGrassGeometry(grassHeight, 4, useFloat16);
+    const lowLOD = createGrassGeometry(grassHeight, 1, useFloat16);
     const ultraLowLOD = createGrassGeometry(grassHeight, 1, useFloat16);
 
     return {

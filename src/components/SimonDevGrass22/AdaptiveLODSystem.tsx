@@ -114,13 +114,36 @@ export const useAdaptiveLODSystem = () => {
             Math.pow(tile.centerZ - cameraPos.z, 2)
         );
 
+        // Hysteresis: use different thresholds for switching up vs down to prevent flickering
         let newLOD: string;
-        if (distance < config.GRASS_LOD_DISTANCE) {
-          newLOD = "HIGH";
-        } else if (distance < config.GRASS_ULTRA_LOW_DISTANCE) {
-          newLOD = "LOW";
+        const currentLOD = tile.currentLOD || "HIGH";
+
+        if (currentLOD === "HIGH") {
+          // Switch down from HIGH to LOW at 50 (10 units farther than switching up)
+          newLOD =
+            distance < 50.0
+              ? "HIGH"
+              : distance < config.GRASS_ULTRA_LOW_DISTANCE + 10
+                ? "LOW"
+                : "ULTRA_LOW";
+        } else if (currentLOD === "LOW") {
+          // Switch up from LOW to HIGH at 35 (10 units closer than switching down)
+          // Switch down from LOW to ULTRA_LOW at config.GRASS_ULTRA_LOW_DISTANCE + 10
+          if (distance < 35.0) {
+            newLOD = "HIGH";
+          } else if (distance < config.GRASS_ULTRA_LOW_DISTANCE + 10) {
+            newLOD = "LOW";
+          } else {
+            newLOD = "ULTRA_LOW";
+          }
         } else {
-          newLOD = "ULTRA_LOW";
+          // ULTRA_LOW: switch up to LOW at config.GRASS_ULTRA_LOW_DISTANCE
+          newLOD =
+            distance < config.GRASS_ULTRA_LOW_DISTANCE
+              ? distance < 35.0
+                ? "HIGH"
+                : "LOW"
+              : "ULTRA_LOW";
         }
 
         if (newLOD !== tile.currentLOD) {

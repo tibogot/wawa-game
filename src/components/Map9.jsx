@@ -35,6 +35,7 @@ import { ShorelineEffect } from "./ShorelineEffect";
 import { useShorelineEffectControls } from "./useShorelineEffectControls";
 import { ImpostorForest } from "./ImpostorForest";
 import { useImpostorForestControls } from "./useImpostorForestControls";
+import { Lake } from "./Lake";
 
 export const Map9 = forwardRef(
   (
@@ -557,6 +558,8 @@ export const Map9 = forwardRef(
             lodDistances={{ mid: lodMid, low: lodFar }}
           />
         )}
+        {/* Lake */}
+        <Lake position={[0, -5, 0]} />
       </group>
     );
   }
