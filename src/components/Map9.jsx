@@ -33,6 +33,8 @@ import { useRainParticles3DControls } from "./useRainParticles3DControls";
 import { ParticlesFog } from "./ParticlesFog";
 import { ShorelineEffect } from "./ShorelineEffect";
 import { useShorelineEffectControls } from "./useShorelineEffectControls";
+import { ImpostorForest } from "./ImpostorForest";
+import { useImpostorForestControls } from "./useImpostorForestControls";
 
 export const Map9 = forwardRef(
   (
@@ -212,6 +214,19 @@ export const Map9 = forwardRef(
       waterLevel,
       debugMode,
     } = useShorelineEffectControls();
+
+    // Get ImpostorForest controls
+    const {
+      impostorForestEnabled,
+      treeCount,
+      radius,
+      minRadius,
+      centerX,
+      centerY,
+      centerZ,
+      lodMid,
+      lodFar,
+    } = useImpostorForestControls();
 
     // Create stable fallback vectors
     const fallbackPosition = useMemo(() => new THREE.Vector3(0, 0, 0), []);
@@ -529,6 +544,17 @@ export const Map9 = forwardRef(
             noiseScale={noiseScale}
             gradientSharpness={gradientSharpness}
             debugMode={debugMode}
+          />
+        )}
+        {/* Impostor Forest */}
+        {impostorForestEnabled && heightmapLookup && (
+          <ImpostorForest
+            centerPosition={[centerX, centerY, centerZ]}
+            radius={radius}
+            minRadius={minRadius}
+            treeCount={treeCount}
+            getTerrainHeight={getGroundHeight}
+            lodDistances={{ mid: lodMid, low: lodFar }}
           />
         )}
       </group>

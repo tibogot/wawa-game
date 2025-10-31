@@ -40,6 +40,7 @@ export const ParticlesFog: React.FC<ParticlesFogProps> = ({
     particleSize,
     useTexture,
     volumetricLayers,
+    color,
   } = useControls("🌫️ Particles Fog", {
     enabled: { value: defaultEnableFog, label: "Enable Fog" },
     density: {
@@ -92,6 +93,7 @@ export const ParticlesFog: React.FC<ParticlesFogProps> = ({
       max: 10,
       step: 1,
     },
+    color: { value: "#ffffff", label: "Color" },
   });
   const instancedMeshRefs = useRef<(THREE.InstancedMesh | null)[]>([]);
   const { windUniforms } = useGlobalWind();
@@ -184,6 +186,7 @@ export const ParticlesFog: React.FC<ParticlesFogProps> = ({
 
       const material = new THREE.MeshLambertMaterial({
         map: fogTexture || fallbackTexture,
+        color: new THREE.Color(color),
         transparent: true,
         opacity: layerOpacity,
         side: THREE.DoubleSide,
@@ -196,17 +199,20 @@ export const ParticlesFog: React.FC<ParticlesFogProps> = ({
       materials.push(material);
     }
     return materials;
-  }, [fogTexture, useTexture, opacity, volumetricLayers]);
+  }, [fogTexture, useTexture, opacity, volumetricLayers, color]);
 
-  // Update materials when texture loads
+  // Update materials when texture or color changes
   useEffect(() => {
-    if (fogMaterials && fogTexture) {
+    if (fogMaterials) {
       fogMaterials.forEach((material) => {
-        material.map = fogTexture;
+        if (fogTexture) {
+          material.map = fogTexture;
+        }
+        material.color.set(color);
         material.needsUpdate = true;
       });
     }
-  }, [fogMaterials, fogTexture]);
+  }, [fogMaterials, fogTexture, color]);
 
   // Initialize fog particle positions and properties for each layer
   interface FogData {
@@ -242,10 +248,10 @@ export const ParticlesFog: React.FC<ParticlesFogProps> = ({
         const heightFactor = Math.pow(Math.random(), 2); // Bias towards lower heights
         const x = (Math.random() - 0.5) * areaSize;
         const z = (Math.random() - 0.5) * areaSize;
-        
+
         data.positions[i3] = x;
         // Use terrain height if available, otherwise use fixed height
-        data.positions[i3 + 1] = getTerrainHeight 
+        data.positions[i3 + 1] = getTerrainHeight
           ? getTerrainHeight(x, z) + heightFactor * height
           : heightFactor * height;
         data.positions[i3 + 2] = z;
@@ -305,10 +311,10 @@ export const ParticlesFog: React.FC<ParticlesFogProps> = ({
           const heightFactor = Math.pow(Math.random(), 2);
           const respawnX = (Math.random() - 0.5) * areaSize;
           const respawnZ = (Math.random() - 0.5) * areaSize;
-          
+
           fogData.positions[i3] = respawnX;
           // Use terrain height if available
-          fogData.positions[i3 + 1] = getTerrainHeight 
+          fogData.positions[i3 + 1] = getTerrainHeight
             ? getTerrainHeight(respawnX, respawnZ) + heightFactor * height
             : heightFactor * height;
           fogData.positions[i3 + 2] = respawnZ;

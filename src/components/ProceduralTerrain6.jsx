@@ -184,6 +184,8 @@ function TerrainChunk({
   heightPeak,
   terrainControls,
   groundTexture,
+  normalMapTexture,
+  roughnessMapTexture,
   textureRepeat,
   useTexture,
 }) {
@@ -285,7 +287,7 @@ function TerrainChunk({
     const material = new THREE.MeshStandardMaterial({
       color: color,
       flatShading: false,
-      roughness: 0.95,
+      roughness: 10, // Lower = shinier, higher = rougher (0.0 to 1.0)
       metalness: 0.0,
       envMapIntensity: 0.3,
     });
@@ -301,6 +303,50 @@ function TerrainChunk({
       texture.minFilter = THREE.LinearMipmapLinearFilter;
       texture.magFilter = THREE.LinearFilter;
       material.map = texture;
+    }
+
+    // Apply normal map if provided and enabled
+    if (useTexture && normalMapTexture) {
+      const normalMap = normalMapTexture.clone();
+      normalMap.wrapS = THREE.RepeatWrapping;
+      normalMap.wrapT = THREE.RepeatWrapping;
+      normalMap.repeat.set(textureRepeat, textureRepeat);
+      normalMap.anisotropy = 16;
+      normalMap.minFilter = THREE.LinearMipmapLinearFilter;
+      normalMap.magFilter = THREE.LinearFilter;
+      material.normalMap = normalMap;
+      // Normal scale - 1.0 is standard, adjust as needed (0.5-2.0 range is typical)
+      material.normalScale = new THREE.Vector2(0.1, 0.1);
+      // Set normal map type - "NormalGL" suggests OpenGL format
+      material.normalMapType = THREE.TangentSpaceNormalMap;
+    } else {
+      // Debug log if not applied
+      if (useTexture) {
+        console.warn(
+          "⚠️ Normal map not applied - texture missing or useTexture disabled"
+        );
+      }
+    }
+
+    // Apply roughness map if provided and enabled
+    if (useTexture && roughnessMapTexture) {
+      const roughnessMap = roughnessMapTexture.clone();
+      roughnessMap.wrapS = THREE.RepeatWrapping;
+      roughnessMap.wrapT = THREE.RepeatWrapping;
+      roughnessMap.repeat.set(textureRepeat, textureRepeat);
+      roughnessMap.anisotropy = 16;
+      roughnessMap.minFilter = THREE.LinearMipmapLinearFilter;
+      roughnessMap.magFilter = THREE.LinearFilter;
+      material.roughnessMap = roughnessMap;
+      // When using roughness map, set base roughness (lower = shinier, higher = rougher)
+      material.roughness = 10; // Changed from 1.0 - adjust this value as needed
+    } else {
+      // Debug log if not applied
+      if (useTexture) {
+        console.warn(
+          "⚠️ Roughness map not applied - texture missing or useTexture disabled"
+        );
+      }
     }
 
     // Only apply shader-based coloring if height gradient is enabled
@@ -474,6 +520,8 @@ function TerrainChunk({
     heightSlope,
     heightPeak,
     groundTexture,
+    normalMapTexture,
+    roughnessMapTexture,
     textureRepeat,
     useTexture,
   ]);
@@ -585,23 +633,59 @@ export const ProceduralTerrain6 = ({
   onTerrainReady,
   onHeightmapReady,
 }) => {
-  // Load ground texture
+  // Load all terrain textures
   const groundTexture = useLoader(
     TextureLoader,
     "/textures/Ground036_1K-JPG_Color.jpg"
   );
+  const normalMapTexture = useLoader(
+    TextureLoader,
+    "/textures/Ground036_1K-JPG_NormalGL.jpg"
+  );
+  const roughnessMapTexture = useLoader(
+    TextureLoader,
+    "/textures/Ground036_1K-JPG_Roughness.jpg"
+  );
 
-  // Initialize texture settings once
+  // Initialize texture settings once and verify loading
   useEffect(() => {
     if (groundTexture) {
+      console.log("✅ Color texture loaded:", groundTexture.image?.src);
       groundTexture.wrapS = THREE.RepeatWrapping;
       groundTexture.wrapT = THREE.RepeatWrapping;
       groundTexture.minFilter = THREE.LinearMipmapLinearFilter;
       groundTexture.magFilter = THREE.LinearFilter;
       groundTexture.generateMipmaps = true;
       groundTexture.anisotropy = 16;
+    } else {
+      console.warn("⚠️ Color texture not loaded!");
     }
-  }, [groundTexture]);
+    if (normalMapTexture) {
+      console.log("✅ Normal map texture loaded:", normalMapTexture.image?.src);
+      normalMapTexture.wrapS = THREE.RepeatWrapping;
+      normalMapTexture.wrapT = THREE.RepeatWrapping;
+      normalMapTexture.minFilter = THREE.LinearMipmapLinearFilter;
+      normalMapTexture.magFilter = THREE.LinearFilter;
+      normalMapTexture.generateMipmaps = true;
+      normalMapTexture.anisotropy = 16;
+    } else {
+      console.warn("⚠️ Normal map texture not loaded!");
+    }
+    if (roughnessMapTexture) {
+      console.log(
+        "✅ Roughness map texture loaded:",
+        roughnessMapTexture.image?.src
+      );
+      roughnessMapTexture.wrapS = THREE.RepeatWrapping;
+      roughnessMapTexture.wrapT = THREE.RepeatWrapping;
+      roughnessMapTexture.minFilter = THREE.LinearMipmapLinearFilter;
+      roughnessMapTexture.magFilter = THREE.LinearFilter;
+      roughnessMapTexture.generateMipmaps = true;
+      roughnessMapTexture.anisotropy = 16;
+    } else {
+      console.warn("⚠️ Roughness map texture not loaded!");
+    }
+  }, [groundTexture, normalMapTexture, roughnessMapTexture]);
 
   const {
     terrainSize,
@@ -1015,6 +1099,8 @@ export const ProceduralTerrain6 = ({
           heightPeak={heightPeak}
           terrainControls={terrainControls}
           groundTexture={groundTexture}
+          normalMapTexture={normalMapTexture}
+          roughnessMapTexture={roughnessMapTexture}
           textureRepeat={textureRepeat}
           useTexture={useTexture}
         />
@@ -1059,6 +1145,8 @@ export const ProceduralTerrain6 = ({
             heightPeak={heightPeak}
             terrainControls={terrainControls}
             groundTexture={groundTexture}
+            normalMapTexture={normalMapTexture}
+            roughnessMapTexture={roughnessMapTexture}
             textureRepeat={textureRepeat}
             useTexture={useTexture}
           />
