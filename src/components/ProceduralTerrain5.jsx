@@ -30,7 +30,7 @@ function getTerrainHeight(
     mountainIntensity = 1.0,
     flatnessThreshold = 0.35,
     flatnessSmooth = 0.25,
-    ridgeSharpness = 2.5,
+    ridgeSharpness = 1.8,
     valleyDepth = 0.4,
     detailAmount = 0.18,
     biomeVariation = 0.5,
@@ -54,19 +54,32 @@ function getTerrainHeight(
       (1 - flatnessSmooth);
   }
 
-  // === RIDGED MOUNTAINS - Sharp peaks and ridges ===
+  // === RIDGED MOUNTAINS - Smooth peaks and ridges (softened to prevent spikes) ===
   const ridgeFreq = 0.0012; // Slightly lower for smoother transitions
   let ridge1 = Math.abs(noise3(worldX * ridgeFreq, worldZ * ridgeFreq));
   ridge1 = 1 - ridge1; // Invert to create ridges
-  ridge1 = Math.pow(ridge1, ridgeSharpness);
+
+  // Smooth the ridge before applying sharpness to prevent spikes
+  // Use a gentler curve that avoids extreme peaks
+  ridge1 = Math.pow(ridge1, Math.max(1.0, ridgeSharpness * 0.6)); // Reduced sharpness multiplier
+
+  // Apply additional smoothing to the ridge
+  ridge1 = Math.pow(ridge1, 0.85); // Smooth out any remaining sharp peaks
 
   let ridge2 = Math.abs(
     noise4(worldX * ridgeFreq * 2.3 + 2000, worldZ * ridgeFreq * 2.3 + 2000)
   );
   ridge2 = 1 - ridge2;
-  ridge2 = Math.pow(ridge2, ridgeSharpness * 0.9);
 
-  const ridgeTerrain = (ridge1 * 0.75 + ridge2 * 0.25) * mountainIntensity;
+  // Smooth ridge2 similarly
+  ridge2 = Math.pow(ridge2, Math.max(1.0, ridgeSharpness * 0.55));
+  ridge2 = Math.pow(ridge2, 0.85);
+
+  // Blend ridges more smoothly
+  const ridgeBlend = ridge1 * 0.75 + ridge2 * 0.25;
+
+  // Apply gentle smoothing to the final ridge blend to prevent spikes
+  const ridgeTerrain = Math.pow(ridgeBlend, 0.95) * mountainIntensity;
 
   // === BASE TERRAIN - Gentle undulating landscape ===
   const baseFreq = 0.0005; // Even gentler for BOTW-style flow
@@ -90,11 +103,13 @@ function getTerrainHeight(
   const hills =
     noise4(worldX * hillFreq + 6000, worldZ * hillFreq + 6000) * 0.25;
 
-  // === FINE DETAIL - Surface texture ===
+  // === FINE DETAIL - Surface texture (reduced to prevent spikes) ===
   const detailFreq = 0.007;
+  // Reduce detail noise intensity to prevent tiny spikes the geometry can't represent
   const detail =
     noise2(worldX * detailFreq + 7000, worldZ * detailFreq + 7000) *
-    detailAmount;
+    detailAmount *
+    0.6; // Reduced by 40% to prevent spike artifacts
 
   // === COMBINE LAYERS ===
   // Mountain regions get ridges, flat regions stay mostly flat
@@ -121,7 +136,16 @@ function getTerrainHeight(
   // Apply flatness factor to reduce all variation in flat areas
   height = height * flatnessFactor;
 
-  const finalHeight = height * heightScale;
+  // Smooth the final height to remove any remaining spikes
+  // This acts as a gentle low-pass filter on the noise output
+  // We can't sample neighbors here, but we can apply a smoothing function
+  // by slightly reducing extreme values
+  const heightNormalized = height;
+  const smoothedHeight =
+    heightNormalized * 0.98 +
+    Math.sign(heightNormalized) * Math.abs(heightNormalized) * 0.02 * 0.5;
+
+  const finalHeight = smoothedHeight * heightScale;
 
   // Safety check - clamp height to prevent rendering issues
   if (!isFinite(finalHeight) || Math.abs(finalHeight) > 10000) {
@@ -144,6 +168,11 @@ function TerrainChunk({
   maxSegments,
   segmentsPerChunk,
   enableHeightGradient,
+  enableColorNoise,
+  colorNoiseScale,
+  enableTextureNoise,
+  textureNoiseScale,
+  textureFrequency,
   valleyColor,
   grassColor,
   mountainColor,
@@ -271,6 +300,16 @@ function TerrainChunk({
         shader.uniforms.heightGrass = { value: heightGrass };
         shader.uniforms.heightSlope = { value: heightSlope };
         shader.uniforms.heightPeak = { value: heightPeak };
+        // Noise uniforms
+        shader.uniforms.enableColorNoise = {
+          value: enableColorNoise ? 1.0 : 0.0,
+        };
+        shader.uniforms.colorNoiseScale = { value: colorNoiseScale };
+        shader.uniforms.enableTextureNoise = {
+          value: enableTextureNoise ? 1.0 : 0.0,
+        };
+        shader.uniforms.textureNoiseScale = { value: textureNoiseScale };
+        shader.uniforms.textureFrequency = { value: textureFrequency };
 
         // Modify vertex shader to pass world position
         shader.vertexShader = shader.vertexShader.replace(
@@ -289,7 +328,7 @@ function TerrainChunk({
           `
         );
 
-        // Modify fragment shader to add height-based coloring
+        // Modify fragment shader to add height-based coloring with noise
         shader.fragmentShader = shader.fragmentShader.replace(
           "#include <common>",
           `
@@ -303,6 +342,30 @@ function TerrainChunk({
           uniform float heightGrass;
           uniform float heightSlope;
           uniform float heightPeak;
+          uniform float enableColorNoise;
+          uniform float colorNoiseScale;
+          uniform float enableTextureNoise;
+          uniform float textureNoiseScale;
+          uniform float textureFrequency;
+          
+          // Simple hash-based noise function for GPU (similar to Simplex noise)
+          float hash(vec2 p) {
+            p = mod(p, 256.0);
+            return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+          }
+          
+          float noise(vec2 p) {
+            vec2 i = floor(p);
+            vec2 f = fract(p);
+            f = f * f * (3.0 - 2.0 * f);
+            
+            float a = hash(i);
+            float b = hash(i + vec2(1.0, 0.0));
+            float c = hash(i + vec2(0.0, 1.0));
+            float d = hash(i + vec2(1.0, 1.0));
+            
+            return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+          }
           
           vec3 getHeightColor(float height) {
             vec3 color;
@@ -328,6 +391,28 @@ function TerrainChunk({
           `
           #include <color_fragment>
           vec3 heightColor = getHeightColor(vWorldPos.y);
+          
+          // Apply color noise variation (like ProceduralTerrain4)
+          if (enableColorNoise > 0.5) {
+            float noiseFreq = 0.008;
+            vec2 noisePos = vWorldPos.xz * noiseFreq;
+            float n1 = noise(noisePos);
+            float n2 = noise(noisePos * 2.7);
+            float colorVariation = (n1 * 0.65 + n2 * 0.35) * colorNoiseScale * 2.0 - colorNoiseScale;
+            float variation = 1.0 + colorVariation * 0.5;
+            heightColor *= variation;
+          }
+          
+          // Apply texture detail noise (like ProceduralTerrain4)
+          if (enableTextureNoise > 0.5) {
+            vec2 texPos = vWorldPos.xz * textureFrequency;
+            float n1 = noise(texPos);
+            float n2 = noise(texPos * 2.2);
+            float textureDetail = (n1 * 0.65 + n2 * 0.35) * textureNoiseScale * 2.0 - textureNoiseScale;
+            float texVariation = 1.0 + textureDetail * 0.3;
+            heightColor *= texVariation;
+          }
+          
           diffuseColor.rgb = heightColor;
           `
         );
@@ -342,6 +427,77 @@ function TerrainChunk({
     showColorDebug,
     segmentsPerChunk,
     enableHeightGradient,
+    enableColorNoise,
+    colorNoiseScale,
+    enableTextureNoise,
+    textureNoiseScale,
+    textureFrequency,
+    valleyColor,
+    grassColor,
+    mountainColor,
+    peakColor,
+    heightValley,
+    heightGrass,
+    heightSlope,
+    heightPeak,
+  ]);
+
+  // Update shader uniforms when noise settings change
+  useEffect(() => {
+    if (material && material.userData && material.userData.shader) {
+      const shader = material.userData.shader;
+      if (shader.uniforms) {
+        if (shader.uniforms.enableColorNoise !== undefined) {
+          shader.uniforms.enableColorNoise.value = enableColorNoise ? 1.0 : 0.0;
+        }
+        if (shader.uniforms.colorNoiseScale) {
+          shader.uniforms.colorNoiseScale.value = colorNoiseScale;
+        }
+        if (shader.uniforms.enableTextureNoise !== undefined) {
+          shader.uniforms.enableTextureNoise.value = enableTextureNoise
+            ? 1.0
+            : 0.0;
+        }
+        if (shader.uniforms.textureNoiseScale) {
+          shader.uniforms.textureNoiseScale.value = textureNoiseScale;
+        }
+        if (shader.uniforms.textureFrequency) {
+          shader.uniforms.textureFrequency.value = textureFrequency;
+        }
+        // Also update color uniforms if they change
+        if (shader.uniforms.colorValley) {
+          shader.uniforms.colorValley.value.set(valleyColor);
+        }
+        if (shader.uniforms.colorGrass) {
+          shader.uniforms.colorGrass.value.set(grassColor);
+        }
+        if (shader.uniforms.colorMountain) {
+          shader.uniforms.colorMountain.value.set(mountainColor);
+        }
+        if (shader.uniforms.colorPeak) {
+          shader.uniforms.colorPeak.value.set(peakColor);
+        }
+        if (shader.uniforms.heightValley) {
+          shader.uniforms.heightValley.value = heightValley;
+        }
+        if (shader.uniforms.heightGrass) {
+          shader.uniforms.heightGrass.value = heightGrass;
+        }
+        if (shader.uniforms.heightSlope) {
+          shader.uniforms.heightSlope.value = heightSlope;
+        }
+        if (shader.uniforms.heightPeak) {
+          shader.uniforms.heightPeak.value = heightPeak;
+        }
+      }
+    }
+  }, [
+    material,
+    enableColorNoise,
+    colorNoiseScale,
+    enableTextureNoise,
+    textureNoiseScale,
+    textureFrequency,
     valleyColor,
     grassColor,
     mountainColor,
@@ -395,6 +551,11 @@ export const ProceduralTerrain5 = ({
     terrainLodMedium,
     terrainLodFar,
     enableHeightGradient,
+    enableColorNoise,
+    colorNoiseScale,
+    enableTextureNoise,
+    textureNoiseScale,
+    textureFrequency,
     valleyColor,
     grassColor,
     mountainColor,
@@ -493,17 +654,46 @@ export const ProceduralTerrain5 = ({
       value: true,
       label: "🎨 Enable Height Gradient (Shader)",
     },
+    enableColorNoise: {
+      value: true,
+      label: "🎨 Enable Color Variation (Noise)",
+    },
+    colorNoiseScale: {
+      value: 0.12,
+      min: 0,
+      max: 0.3,
+      step: 0.05,
+      label: "🎨 Color Variation Amount",
+    },
+    enableTextureNoise: {
+      value: true,
+      label: "🔬 Enable Texture Detail (Noise)",
+    },
+    textureNoiseScale: {
+      value: 0.18,
+      min: 0,
+      max: 0.5,
+      step: 0.05,
+      label: "🔬 Texture Detail Amount",
+    },
+    textureFrequency: {
+      value: 0.35,
+      min: 0.05,
+      max: 1.0,
+      step: 0.05,
+      label: "🔬 Texture Detail Frequency",
+    },
     // BOTW-inspired color palette
     valleyColor: {
-      value: "#2d5016", // Darker green for valleys
+      value: "#133808", // Darker green for valleys
       label: "🌿 Valley Color (Low/Flat)",
     },
     grassColor: {
-      value: "#4a7c3a", // Vibrant green for plains
+      value: "#1d4110", // Vibrant green for plains
       label: "🌾 Grass Color (Mid/Gentle)",
     },
     mountainColor: {
-      value: "#6b5b3d", // Brown-gray for mountains
+      value: "#2d5016", // Brown-gray for mountains
       label: "⛰️ Mountain Color (High)",
     },
     peakColor: {
@@ -533,7 +723,7 @@ export const ProceduralTerrain5 = ({
     },
     heightPeak: {
       value: heightScale * 0.8,
-      min: 50,
+      min: 140,
       max: 300,
       step: 1,
       label: "Peak Height (snow line)",
@@ -560,11 +750,11 @@ export const ProceduralTerrain5 = ({
       label: "🌾 Flatness Smoothness",
     },
     ridgeSharpness: {
-      value: 2.5,
+      value: 1.8,
       min: 0.5,
       max: 5,
       step: 0.1,
-      label: "⛰️ Ridge Sharpness",
+      label: "⛰️ Ridge Sharpness (softer to prevent spikes)",
     },
     valleyDepth: {
       value: 0.4,
@@ -574,11 +764,11 @@ export const ProceduralTerrain5 = ({
       label: "🏞️ Valley Depth",
     },
     detailAmount: {
-      value: 0.06,
+      value: 0.04,
       min: 0,
       max: 0.5,
       step: 0.01,
-      label: "✨ Detail Amount",
+      label: "✨ Detail Amount (reduced to prevent spikes)",
     },
   });
 
@@ -730,6 +920,11 @@ export const ProceduralTerrain5 = ({
           maxSegments={terrainSegments}
           segmentsPerChunk={terrainSegments}
           enableHeightGradient={enableHeightGradient}
+          enableColorNoise={enableColorNoise}
+          colorNoiseScale={colorNoiseScale}
+          enableTextureNoise={enableTextureNoise}
+          textureNoiseScale={textureNoiseScale}
+          textureFrequency={textureFrequency}
           valleyColor={valleyColor}
           grassColor={grassColor}
           mountainColor={mountainColor}
@@ -766,6 +961,11 @@ export const ProceduralTerrain5 = ({
             maxSegments={terrainSegments}
             segmentsPerChunk={segmentsPerChunk}
             enableHeightGradient={enableHeightGradient}
+            enableColorNoise={enableColorNoise}
+            colorNoiseScale={colorNoiseScale}
+            enableTextureNoise={enableTextureNoise}
+            textureNoiseScale={textureNoiseScale}
+            textureFrequency={textureFrequency}
             valleyColor={valleyColor}
             grassColor={grassColor}
             mountainColor={mountainColor}

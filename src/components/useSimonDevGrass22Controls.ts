@@ -92,7 +92,7 @@ export const useSimonDevGrass22Controls = () => {
         // Normal/lighting helpers
         normalsAO: folder(
           {
-            enableNormalMap: { value: true, label: "🟦 Enable Normal Map" },
+            enableNormalMap: { value: false, label: "🟦 Enable Normal Map" },
             enableAmbientOcclusion: {
               value: true,
               label: "🕳️ Ambient Occlusion",

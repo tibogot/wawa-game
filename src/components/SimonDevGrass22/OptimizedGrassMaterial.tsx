@@ -240,6 +240,38 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
         if ((shader.uniforms as any).u_roughnessIntensity)
           (shader.uniforms as any).u_roughnessIntensity.value =
             config.roughnessIntensity ?? 1.0;
+
+        // Ambient Occlusion
+        if ((shader.uniforms as any).u_enableAmbientOcclusion)
+          (shader.uniforms as any).u_enableAmbientOcclusion.value =
+            config.enableAmbientOcclusion;
+        if ((shader.uniforms as any).u_grassDensity)
+          (shader.uniforms as any).u_grassDensity.value = config.grassDensity;
+        if ((shader.uniforms as any).u_aoStrength)
+          (shader.uniforms as any).u_aoStrength.value = config.aoStrength;
+        if ((shader.uniforms as any).u_aoHeightPower)
+          (shader.uniforms as any).u_aoHeightPower.value = config.aoHeightPower;
+        if ((shader.uniforms as any).u_aoDebugMode)
+          (shader.uniforms as any).u_aoDebugMode.value = config.aoDebugMode;
+
+        // Gradient uniforms
+        if ((shader.uniforms as any).u_enableDebugShader)
+          (shader.uniforms as any).u_enableDebugShader.value =
+            config.enableDebugShader;
+        if ((shader.uniforms as any).u_enableBaseToTipGradient)
+          (shader.uniforms as any).u_enableBaseToTipGradient.value =
+            config.enableBaseToTipGradient;
+        if ((shader.uniforms as any).u_baseColor) {
+          const baseColor = new THREE.Color(config.baseColor);
+          (shader.uniforms as any).u_baseColor.value.copy(baseColor);
+        }
+        if ((shader.uniforms as any).u_tipColor) {
+          const tipColor = new THREE.Color(config.tipColor);
+          (shader.uniforms as any).u_tipColor.value.copy(tipColor);
+        }
+        if ((shader.uniforms as any).u_gradientShaping)
+          (shader.uniforms as any).u_gradientShaping.value =
+            config.gradientShaping;
       }
     });
   }, [config]);
@@ -293,6 +325,8 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
       shader.uniforms.u_enableWindMovement = {
         value: config.enableWindMovement,
       };
+      shader.uniforms.u_windSpeed = { value: config.windSpeed };
+      shader.uniforms.u_windStrength = { value: config.windStrength };
       shader.uniforms.u_playerPosition = {
         value: config.characterPosition
           ? config.characterPosition.clone()
@@ -378,6 +412,38 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
         value: config.roughnessIntensity ?? 1.0,
       };
 
+      // Ambient Occlusion uniforms
+      shader.uniforms.u_enableAmbientOcclusion = {
+        value: config.enableAmbientOcclusion,
+      };
+      shader.uniforms.u_grassDensity = {
+        value: config.grassDensity,
+      };
+      shader.uniforms.u_aoStrength = {
+        value: config.aoStrength,
+      };
+      shader.uniforms.u_aoHeightPower = {
+        value: config.aoHeightPower,
+      };
+      shader.uniforms.u_aoDebugMode = {
+        value: config.aoDebugMode,
+      };
+
+      // Gradient uniforms
+      shader.uniforms.u_enableDebugShader = {
+        value: config.enableDebugShader,
+      };
+      shader.uniforms.u_enableBaseToTipGradient = {
+        value: config.enableBaseToTipGradient,
+      };
+      const baseColor = new THREE.Color(config.baseColor);
+      shader.uniforms.u_baseColor = { value: baseColor };
+      const tipColor = new THREE.Color(config.tipColor);
+      shader.uniforms.u_tipColor = { value: tipColor };
+      shader.uniforms.u_gradientShaping = {
+        value: config.gradientShaping,
+      };
+
       // Store shader reference
       newMaterial.userData.shader = shader;
 
@@ -430,8 +496,9 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
         transformed.x += viewSpaceThickenFactor * xDirection * grassWidth * 0.3;
       `;
 
-      // Add wind movement functions to common section if needed (exact copy from v20)
-      if (config.enableWindMovement || config.enablePlayerInteraction) {
+      // Always add wind functions (runtime-gated) and player interaction helpers
+      if (config.enablePlayerInteraction || true) {
+        // Always include wind helpers
         // Add time uniform (wind noise uniforms already added in common section)
         shader.uniforms.u_time = { value: 0.0 };
 
@@ -443,6 +510,8 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
           
           uniform float u_time;
           uniform bool u_enableWindMovement;
+          uniform float u_windSpeed;
+          uniform float u_windStrength;
           uniform float u_windNoiseScale;
           uniform float u_windNoiseSpeed;
           uniform float u_windNoiseAmplitude;
@@ -509,106 +578,94 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
         );
       }
 
-      // Add wind movement logic to combined code (exact copy from v20)
-      if (config.enableWindMovement) {
-        combinedBeginVertexCode += `
+      // Always add wind movement code (runtime-gated via u_enableWindMovement uniform)
+      combinedBeginVertexCode += `
+        
+        // SimonDev's initial curve system - applied BEFORE wind
+        // Use instanceWorldPos (already calculated at the top) for consistent randomness and wind patterns
+        // Generate per-blade hash for consistent randomness (use world position for consistency across tiles)
+        float perBladeHash = fract(sin(dot(instanceWorldPos.xz, vec2(12.9898, 78.233))) * 43758.5453);
+        
+        // Generate random lean amount (-0.3 to 0.3)
+        float randomLean = (perBladeHash - 0.5) * 0.6;
+        
+        // Apply initial curve based on vertex height (stronger at tips)
+        float heightPercent = transformed.y / ${config.grassHeight.toFixed(1)};
+        float curveAmount = randomLean * heightPercent;
+        
+        // Apply curve rotation around X-axis (forward/backward bend)
+        mat3 curveMat = rotateX(curveAmount);
+        transformed = curveMat * transformed;
+        transformedNormal = curveMat * transformedNormal;
+        
+        // Apply wind movement - runtime gated by uniform (works regardless of normal map)
+        if (u_enableWindMovement && windInfluence > 0.0) {
+          // Use world position for noise sampling - ensures consistent wind patterns across all tiles
+          vec3 worldPos = instanceWorldPos;
           
-          // SimonDev's initial curve system - applied BEFORE wind
-          // Use instanceWorldPos (already calculated at the top) for consistent randomness and wind patterns
-          // Generate per-blade hash for consistent randomness (use world position for consistency across tiles)
-          float perBladeHash = fract(sin(dot(instanceWorldPos.xz, vec2(12.9898, 78.233))) * 43758.5453);
+          // SimonDev's approach: Multiple noise samples for wind system
           
-          // Generate random lean amount (-0.3 to 0.3)
-          float randomLean = (perBladeHash - 0.5) * 0.6;
+          // 1. First noise sample for subtle movement (add to curve)
+          float subtleNoise = smoothNoise(vec2(u_time * u_windSpeed * u_windNoiseSpeed) + worldPos.xz * u_windNoiseScale);
+          subtleNoise *= u_windNoiseAmplitude;
           
-          // Apply initial curve based on vertex height (stronger at tips)
+          // 2. Wind direction sample - remap to 0-360 degrees (0 to 2PI)
+          float windDirNoise = smoothNoise(worldPos.xz * u_windNoiseScale * 0.05 + u_time * u_windSpeed * u_windNoiseSpeed * 0.05);
+          float windDirection = windDirNoise; // Will remap below
+          
+          // 3. Wind strength sample - different spatial frequency
+          float windStrengthNoise = smoothNoise(worldPos.xz * u_windNoiseScale * 0.25 + u_time * u_windSpeed * u_windNoiseSpeed);
+          windStrengthNoise *= u_windNoiseAmplitude;
+          
+          // Remap wind direction to 0-360 degrees (0 to 2PI radians)
+          windDirection = windDirection * 0.5 + 0.5; // -1,1 to 0,1
+          windDirection *= 6.28318; // 0,1 to 0,2PI (360 degrees)
+          
+          // Calculate final wind strength based on height and wind influence
           float heightPercent = transformed.y / ${config.grassHeight.toFixed(
             1
           )};
-          float curveAmount = randomLean * heightPercent;
+          float windStrength = windStrengthNoise * u_windStrength * heightPercent * windInfluence;
           
-          // Apply curve rotation around X-axis (forward/backward bend)
-          mat3 curveMat = rotateX(curveAmount);
-          transformed = curveMat * transformed;
-          transformedNormal = curveMat * transformedNormal;
+          // Apply wind movement with proper wave pattern
+          // Create floppy grass effect using vertex height for flexibility
+          float vertexHeight = transformed.y; // Current vertex height (0 = base, max = tip)
+          float bladeLength = ${config.grassHeight.toFixed(
+            1
+          )}; // Total blade length
           
-          // Apply wind movement - runtime gated by uniform
-          if (u_enableWindMovement && windInfluence > 0.0) {
-            // Use world position for noise sampling - ensures consistent wind patterns across all tiles
-            vec3 worldPos = instanceWorldPos;
-            
-            // SimonDev's approach: Multiple noise samples for wind system
-            
-            // 1. First noise sample for subtle movement (add to curve)
-            float subtleNoise = smoothNoise(vec2(u_time * ${config.windSpeed.toFixed(
-              2
-            )} * u_windNoiseSpeed) + worldPos.xz * u_windNoiseScale);
-            subtleNoise *= u_windNoiseAmplitude;
-            
-            // 2. Wind direction sample - remap to 0-360 degrees (0 to 2PI)
-            float windDirNoise = smoothNoise(worldPos.xz * u_windNoiseScale * 0.05 + u_time * ${config.windSpeed.toFixed(
-              2
-            )} * u_windNoiseSpeed * 0.05);
-            float windDirection = windDirNoise; // Will remap below
-            
-            // 3. Wind strength sample - different spatial frequency
-            float windStrengthNoise = smoothNoise(worldPos.xz * u_windNoiseScale * 0.25 + u_time * ${config.windSpeed.toFixed(
-              2
-            )} * u_windNoiseSpeed);
-            windStrengthNoise *= u_windNoiseAmplitude;
-            
-            // Remap wind direction to 0-360 degrees (0 to 2PI radians)
-            windDirection = windDirection * 0.5 + 0.5; // -1,1 to 0,1
-            windDirection *= 6.28318; // 0,1 to 0,2PI (360 degrees)
-            
-            // Calculate final wind strength based on height and wind influence
-            float heightPercent = transformed.y / ${config.grassHeight.toFixed(
-              1
-            )};
-            float windStrength = windStrengthNoise * ${config.windStrength.toFixed(
-              2
-            )} * heightPercent * windInfluence;
-            
-            // Apply wind movement with proper wave pattern
-            // Create floppy grass effect using vertex height for flexibility
-            float vertexHeight = transformed.y; // Current vertex height (0 = base, max = tip)
-            float bladeLength = ${config.grassHeight.toFixed(
-              1
-            )}; // Total blade length
-            
-            // Calculate flexibility factor: base is stiff (0), tip is floppy (1)
-            float flexibilityFactor = vertexHeight / bladeLength;
-            flexibilityFactor = pow(flexibilityFactor, 1.5); // Curve the flexibility for more natural bend
-            
-            // Apply rotation-based wind bending around the blade BASE - NO STRETCHING!
-            // WHOLE BLADE rotates as one unit around its base
-            // Use wind direction to determine rotation axis and amount
-            
-            // Convert wind direction to rotation components
-            float windRotationX = sin(windDirection) * windStrength * 0.5; // Forward-back rotation
-            float windRotationY = cos(windDirection) * windStrength * 0.8; // Side-to-side rotation
-            
-            // Create rotation matrices
-            mat3 rotX = rotateX(windRotationX);
-            mat3 rotY = rotateY(windRotationY);
-            
-            // Rotate around the blade BASE (Y=0) - ALL vertices rotate the same amount
-            vec3 basePoint = vec3(0.0, 0.0, 0.0); // Blade base
-            vec3 offsetFromBase = transformed - basePoint;
-            
-            // Apply rotations around the base - SAME rotation for all vertices
-            offsetFromBase = rotY * offsetFromBase;
-            offsetFromBase = rotX * offsetFromBase;
-            
-            // Apply the same rotations to normals for proper lighting
-            transformedNormal = rotY * transformedNormal;
-            transformedNormal = rotX * transformedNormal;
-            
-            // Move back to final position
-            transformed = basePoint + offsetFromBase;
-          }
-        `;
-      }
+          // Calculate flexibility factor: base is stiff (0), tip is floppy (1)
+          float flexibilityFactor = vertexHeight / bladeLength;
+          flexibilityFactor = pow(flexibilityFactor, 1.5); // Curve the flexibility for more natural bend
+          
+          // Apply rotation-based wind bending around the blade BASE - NO STRETCHING!
+          // WHOLE BLADE rotates as one unit around its base
+          // Use wind direction to determine rotation axis and amount
+          
+          // Convert wind direction to rotation components
+          float windRotationX = sin(windDirection) * windStrength * 0.5; // Forward-back rotation
+          float windRotationY = cos(windDirection) * windStrength * 0.8; // Side-to-side rotation
+          
+          // Create rotation matrices
+          mat3 rotX = rotateX(windRotationX);
+          mat3 rotY = rotateY(windRotationY);
+          
+          // Rotate around the blade BASE (Y=0) - ALL vertices rotate the same amount
+          vec3 basePoint = vec3(0.0, 0.0, 0.0); // Blade base
+          vec3 offsetFromBase = transformed - basePoint;
+          
+          // Apply rotations around the base - SAME rotation for all vertices
+          offsetFromBase = rotY * offsetFromBase;
+          offsetFromBase = rotX * offsetFromBase;
+          
+          // Apply the same rotations to normals for proper lighting
+          transformedNormal = rotY * transformedNormal;
+          transformedNormal = rotX * transformedNormal;
+          
+          // Move back to final position
+          transformed = basePoint + offsetFromBase;
+        }
+      `;
 
       // Add player interaction uniforms to common section if needed (exact copy from v20)
       if (config.enablePlayerInteraction) {
@@ -702,16 +759,11 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
         );
       }
 
-      // Add uniforms and varyings for all color effects (exact copy from v20)
-      if (
-        config.enableDebugShader ||
-        config.enableBaseToTipGradient ||
-        config.enableAmbientOcclusion
-      ) {
-        // Add uniform for resolution (debug shader) - always add if any color effect is enabled
-        shader.fragmentShader = shader.fragmentShader.replace(
-          "#include <common>",
-          `
+      // Always add color effects section (all features runtime-gated via uniforms)
+      // Add uniform for resolution and all color/lighting uniforms
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <common>",
+        `
           #include <common>
           
           uniform vec2 u_resolution;
@@ -743,12 +795,24 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
           uniform float u_fresnelPower;
           uniform float u_roughnessIntensity;
           
+          // Ambient Occlusion uniforms
+          uniform bool u_enableAmbientOcclusion;
+          uniform float u_grassDensity;
+          uniform float u_aoStrength;
+          uniform float u_aoHeightPower;
+          uniform bool u_aoDebugMode;
+          
+          // Gradient uniforms
+          uniform bool u_enableBaseToTipGradient;
+          uniform vec3 u_baseColor;
+          uniform vec3 u_tipColor;
+          uniform float u_gradientShaping;
+          uniform bool u_enableDebugShader;
+          
           // Contact Shadow function - simulates ground shadows
           float getContactShadow(vec3 worldPos, vec3 lightDir) {
             float shadow = 1.0;
-            float densityShadow = 1.0 - (${config.grassDensity.toFixed(
-              1
-            )} * 0.3);
+            float densityShadow = 1.0 - (u_grassDensity * 0.3);
             float heightPercent = vUv.y;
             float heightShadow = 1.0 - (heightPercent * 0.4);
             float groundDistance = worldPos.y;
@@ -758,31 +822,16 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
             return shadow;
           }
           `
-        );
+      );
 
-        // Pre-calculate color values for GLSL injection
-        let baseRgbStr = "0.0, 0.0, 0.0";
-        let tipRgbStr = "0.0, 0.0, 0.0";
-
-        if (config.enableBaseToTipGradient) {
-          const baseRgb = new THREE.Color(config.baseColor);
-          const tipRgb = new THREE.Color(config.tipColor);
-          baseRgbStr = `${baseRgb.r.toFixed(3)}, ${baseRgb.g.toFixed(
-            3
-          )}, ${baseRgb.b.toFixed(3)}`;
-          tipRgbStr = `${tipRgb.r.toFixed(3)}, ${tipRgb.g.toFixed(
-            3
-          )}, ${tipRgb.b.toFixed(3)}`;
-        }
-
-        // Combined color fragment injection (exact copy from v20)
-        shader.fragmentShader = shader.fragmentShader.replace(
-          "#include <color_fragment>",
-          `
+      // Combined color fragment injection (runtime-gated via uniforms)
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <color_fragment>",
+        `
           #include <color_fragment>
           
           // Debug gradient shader
-          if (${config.enableDebugShader ? "true" : "false"}) {
+          if (u_enableDebugShader) {
             vec2 st = gl_FragCoord.xy / u_resolution.xy;
             vec3 debugColor = vec3(
               st.x / 0.6,                    // Red gradient (left to right)
@@ -792,29 +841,24 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
             diffuseColor.rgb = debugColor;
           }
           // Base-to-tip gradient shader
-          else if (${config.enableBaseToTipGradient ? "true" : "false"}) {
-            vec3 baseColour = vec3(${baseRgbStr});
-            vec3 tipColour = vec3(${tipRgbStr});
+          else if (u_enableBaseToTipGradient) {
             float heightPercent = vUv.y;
-            float shapedHeight = pow(heightPercent, ${config.gradientShaping.toFixed(
-              1
-            )});
-            vec3 gradientColor = mix(baseColour, tipColour, shapedHeight);
+            float shapedHeight = pow(heightPercent, u_gradientShaping);
+            vec3 gradientColor = mix(u_baseColor, u_tipColor, shapedHeight);
             diffuseColor.rgb = gradientColor;
           }
           
-          // Ambient occlusion shader
-          if (${config.enableAmbientOcclusion ? "true" : "false"}) {
-            float density = ${config.grassDensity.toFixed(1)};
+          // Ambient occlusion shader - darkens base, brightens toward tip
+          if (u_enableAmbientOcclusion) {
             float heightPercent = vUv.y;
-            float aoStrength = ${config.aoStrength.toFixed(2)};
-            float aoHeightPower = ${config.aoHeightPower.toFixed(1)};
+            // Base AO: higher density = more occlusion (darker at base)
+            // aoStrength controls how much to darken (0.0 = no darkening, higher = darker)
+            float aoForDensity = mix(1.0, 1.0 - u_aoStrength, u_grassDensity);
+            // Height-based fade: base is darker (uses aoForDensity), tip is lighter (1.0)
+            float ao = mix(aoForDensity, 1.0, pow(heightPercent, u_aoHeightPower));
             
-            float aoForDensity = mix(1.0, aoStrength, density);
-            float ao = mix(aoForDensity, 1.0, pow(heightPercent, aoHeightPower));
-            
-            if (${config.aoDebugMode ? "true" : "false"}) {
-              diffuseColor.rgb = vec3(ao, 1.0 - ao, 0.0); // Red = high AO, Green = low AO
+            if (u_aoDebugMode) {
+              diffuseColor.rgb = vec3(ao, 1.0 - ao, 0.0); // Red = high AO (dark), Green = low AO (bright)
             } else {
               diffuseColor.rgb *= ao;
             }
@@ -829,8 +873,7 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
           // Environment Map reflections (v22) - removed, causes shader errors
           // Will re-add after debugging
           `
-        );
-      }
+      );
 
       // Always add varyings for UV/world/thickness so features don't depend on specific toggles
       // Add varying variable declaration to vertex shader

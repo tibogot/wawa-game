@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback, useMemo, forwardRef } from "react";
 import * as THREE from "three";
-import { ProceduralTerrain4 } from "./ProceduralTerrain4";
+import { ProceduralTerrain5 } from "./ProceduralTerrain5";
 import { SimonDevGrass21 } from "./SimonDevGrass21/SimonDevGrass21";
 import { useSimonDevGrass21Controls } from "./useSimonDevGrass21Controls";
 import { HeightFog } from "./HeightFog";
@@ -257,7 +257,7 @@ export const Map9 = forwardRef(
     return (
       <group ref={group} {...props}>
         <CloudSystem />
-        <ProceduralTerrain4
+        <ProceduralTerrain5
           onTerrainReady={onTerrainReady}
           onHeightmapReady={handleHeightmapReady}
         />
