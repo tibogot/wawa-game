@@ -114,7 +114,7 @@ export const useLightsControls = () => {
           label: "Shadow Blur Radius",
         },
         followCharacter: {
-          value: false,
+          value: true,
           label: "Follow Character",
         },
       },

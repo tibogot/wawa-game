@@ -877,13 +877,17 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
 
       // Always add varyings for UV/world/thickness so features don't depend on specific toggles
       // Add varying variable declaration to vertex shader
+      // vWorldPosition is conditionally declared: if USE_FOG is defined, HeightFog already declared it
       shader.vertexShader = shader.vertexShader.replace(
         "#include <common>",
         `
           #include <common>
           
           varying vec2 vUv;
+          #ifndef USE_FOG
           varying vec3 vWorldPosition;
+          #endif
+          varying vec3 vVertexNormal;
           varying float vThickness;
           varying vec3 vReflect;
           varying vec3 vViewDir;
@@ -891,13 +895,17 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
       );
 
       // Add varying variable declaration to fragment shader
+      // vWorldPosition is conditionally declared: if USE_FOG is defined, HeightFog already declared it
       shader.fragmentShader = shader.fragmentShader.replace(
         "#include <common>",
         `
           #include <common>
           
         varying vec2 vUv;
+        #ifndef USE_FOG
         varying vec3 vWorldPosition;
+        #endif
+        varying vec3 vVertexNormal;
         varying float vThickness;
         varying vec3 vReflect;
         varying vec3 vViewDir;
@@ -912,6 +920,10 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
           
           vUv = uv;
           vWorldPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
+          // View-space position (like v6) for correct moon reflection
+          vViewPosition = (modelViewMatrix * vec4(transformed, 1.0)).xyz;
+          // Vertex normal (before normal map) for consistent moon reflection across tiles
+          vVertexNormal = normalize(normalMatrix * objectNormal);
           // Thickness for SSS: thicker at base, thinner at tips
           float vHeight = position.y / ${config.grassHeight.toFixed(1)};
           vThickness = (1.0 - vHeight) * 0.8 + 0.2;
@@ -931,9 +943,15 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
         `
         #include <lights_fragment_end>
         if (u_enableMoonReflection && u_moonIntensity > 0.0) {
-          vec3 Lm = normalize(u_moonDirection);
-          vec3 Rm = reflect(-Lm, geometryNormal);
-          float moonSpec = pow(max(dot(Rm, geometryViewDir), 0.0), 16.0);
+          // EXACT v6 approach: use view-space calculations for consistent directional spot
+          vec3 normal = normalize(vVertexNormal); // Vertex normal (consistent, not modified by normal map)
+          vec3 viewDir = normalize(-vViewPosition); // View-space direction (like v6)
+          // Moon direction in world space
+          vec3 moonDir = normalize(u_moonDirection);
+          // Reflect moon direction off normal (exact v6 formula)
+          vec3 moonReflectDir = reflect(-moonDir, normal);
+          // v6 uses specularPower * 0.8 (default 32 * 0.8 = 25.6) for directional spot
+          float moonSpec = pow(max(dot(viewDir, moonReflectDir), 0.0), 25.6);
           // Match v6: multiply by intensity and extra 3x for visibility
           vec3 moonSpecular = u_moonColor * moonSpec * u_moonIntensity * 3.0;
           reflectedLight.directSpecular += moonSpecular;

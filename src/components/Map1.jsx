@@ -16,6 +16,7 @@ import LensFlare from "./LensFlare";
 import { FlowingLinesSimple } from "./FlowingLinesSimple";
 import { WindFlag } from "./WindFlag";
 import { useWindFlagControls } from "./useWindFlagControls";
+import { RipplePlane } from "./RipplePlane";
 import * as THREE from "three";
 
 export const Map1 = ({
@@ -99,13 +100,110 @@ export const Map1 = ({
     flareDistance,
   } = useLensFlareControls();
 
-  // Get FlowingLines controls - Map1 specific
-  const { flowingLinesEnabled } = useControls("🗺️ MAP 1", {
+  // Get FlowingLines and RipplePlane controls - Map1 specific
+  const {
+    flowingLinesEnabled,
+    ripplePlaneEnabled,
+    ripplePlaneSize,
+    ripplePlaneSegments,
+    ripplePlaneRadius,
+    ripplePlaneStrength,
+    ripplePlaneSpeed,
+    ripplePlaneFrequency,
+    ripplePlaneColor,
+    ripplePlaneOpacity,
+    ripplePlanePositionX,
+    ripplePlanePositionY,
+    ripplePlanePositionZ,
+  } = useControls("🗺️ MAP 1", {
     flowingLines: folder(
       {
         flowingLinesEnabled: {
           value: false,
           label: "🌊 Enable Flowing Lines",
+        },
+      },
+      { collapsed: true }
+    ),
+    ripplePlane: folder(
+      {
+        ripplePlaneEnabled: {
+          value: false,
+          label: "🌊 Enable Ripple Plane",
+        },
+        ripplePlaneSize: {
+          value: 50,
+          min: 10,
+          max: 200,
+          step: 1,
+          label: "📏 Size",
+        },
+        ripplePlaneSegments: {
+          value: 64,
+          min: 16,
+          max: 128,
+          step: 8,
+          label: "🔲 Segments",
+        },
+        ripplePlaneRadius: {
+          value: 5.0,
+          min: 1.0,
+          max: 20.0,
+          step: 0.5,
+          label: "📐 Ripple Radius",
+        },
+        ripplePlaneStrength: {
+          value: 0.5,
+          min: 0.0,
+          max: 2.0,
+          step: 0.1,
+          label: "💪 Ripple Strength",
+        },
+        ripplePlaneSpeed: {
+          value: 2.0,
+          min: 0.5,
+          max: 10.0,
+          step: 0.1,
+          label: "⚡ Ripple Speed",
+        },
+        ripplePlaneFrequency: {
+          value: 2.0,
+          min: 0.5,
+          max: 10.0,
+          step: 0.1,
+          label: "🌊 Wave Frequency",
+        },
+        ripplePlaneColor: {
+          value: "#4a90e2",
+          label: "🎨 Color",
+        },
+        ripplePlaneOpacity: {
+          value: 0.8,
+          min: 0.0,
+          max: 1.0,
+          step: 0.05,
+          label: "👻 Opacity",
+        },
+        ripplePlanePositionX: {
+          value: 0,
+          min: -100,
+          max: 100,
+          step: 1,
+          label: "📍 Pos X",
+        },
+        ripplePlanePositionY: {
+          value: 0.1,
+          min: -10,
+          max: 10,
+          step: 0.1,
+          label: "📍 Pos Y",
+        },
+        ripplePlanePositionZ: {
+          value: 0,
+          min: -100,
+          max: 100,
+          step: 1,
+          label: "📍 Pos Z",
         },
       },
       { collapsed: true }
@@ -291,6 +389,26 @@ export const Map1 = ({
           enabled={flowingLinesEnabled}
           lineCount={10}
           getTerrainHeight={getGroundHeight}
+        />
+      )}
+
+      {/* Ripple Plane - Interactive water-like surface */}
+      {ripplePlaneEnabled && (
+        <RipplePlane
+          position={[
+            ripplePlanePositionX,
+            ripplePlanePositionY,
+            ripplePlanePositionZ,
+          ]}
+          size={ripplePlaneSize}
+          segments={ripplePlaneSegments}
+          characterPosition={characterPosition || fallbackPosition}
+          rippleRadius={ripplePlaneRadius}
+          rippleStrength={ripplePlaneStrength}
+          rippleSpeed={ripplePlaneSpeed}
+          rippleFrequency={ripplePlaneFrequency}
+          color={ripplePlaneColor}
+          opacity={ripplePlaneOpacity}
         />
       )}
     </group>

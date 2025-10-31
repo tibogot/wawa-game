@@ -26,7 +26,7 @@ export const CloudSystem: React.FC = () => {
       {
         enabled: { value: false, label: "☁️ Enable Clouds" },
         cloudPosition: {
-          value: [0, 800, 0],
+          value: [0, 40, 0],
           label: "Position",
           step: 50,
         },
@@ -120,7 +120,7 @@ export const CloudSystem: React.FC = () => {
           step: 10,
         },
         frustumCulled: {
-          value: true,
+          value: false,
           label: "Frustum Culled",
         },
       },

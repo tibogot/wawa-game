@@ -1,8 +1,11 @@
 import { useRef, useState, useCallback, useMemo, forwardRef } from "react";
 import * as THREE from "three";
 import { ProceduralTerrain5 } from "./ProceduralTerrain5";
+import { ProceduralTerrain6 } from "./ProceduralTerrain6";
 import { SimonDevGrass21 } from "./SimonDevGrass21/SimonDevGrass21";
+import { SimonDevGrass22 } from "./SimonDevGrass22/SimonDevGrass22";
 import { useSimonDevGrass21Controls } from "./useSimonDevGrass21Controls";
+import { useSimonDevGrass22Controls } from "./useSimonDevGrass22Controls";
 import { HeightFog } from "./HeightFog";
 import { useHeightFogControls } from "./useHeightFogControls";
 import { CloudSystem } from "./CloudSystem";
@@ -49,6 +52,8 @@ export const Map9 = forwardRef(
 
     // Get SimonDevGrass21 controls
     const { simonDevGrass21Enabled } = useSimonDevGrass21Controls();
+    // Get SimonDevGrass22 controls
+    const { simonDevGrass22Enabled } = useSimonDevGrass22Controls();
 
     // Get Height Fog controls from hook
     const { heightFogEnabled, fogColor, fogHeight, fogNear, fogFar } =
@@ -257,7 +262,7 @@ export const Map9 = forwardRef(
     return (
       <group ref={group} {...props}>
         <CloudSystem />
-        <ProceduralTerrain5
+        <ProceduralTerrain6
           onTerrainReady={onTerrainReady}
           onHeightmapReady={handleHeightmapReady}
         />
@@ -276,6 +281,18 @@ export const Map9 = forwardRef(
         {/* SimonDevGrass21 Grass System - Only render when heightmap is ready */}
         {simonDevGrass21Enabled && heightmapLookup && (
           <SimonDevGrass21
+            areaSize={200}
+            mapSize={2500}
+            grassHeight={1.0}
+            grassScale={1.0}
+            getGroundHeight={getGroundHeight}
+            characterPosition={characterPosition || fallbackPosition}
+          />
+        )}
+
+        {/* SimonDevGrass22 Grass System - Only render when heightmap is ready */}
+        {simonDevGrass22Enabled && heightmapLookup && (
+          <SimonDevGrass22
             areaSize={200}
             mapSize={2500}
             grassHeight={1.0}
