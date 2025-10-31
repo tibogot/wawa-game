@@ -621,11 +621,8 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
           windDirection = windDirection * 0.5 + 0.5; // -1,1 to 0,1
           windDirection *= 6.28318; // 0,1 to 0,2PI (360 degrees)
           
-          // Calculate final wind strength based on height and wind influence
-          float heightPercent = transformed.y / ${config.grassHeight.toFixed(
-            1
-          )};
-          float windStrength = windStrengthNoise * u_windStrength * heightPercent * windInfluence;
+          // Calculate final wind strength based on wind influence
+          float windStrength = windStrengthNoise * u_windStrength * windInfluence;
           
           // Apply wind movement with proper wave pattern
           // Create floppy grass effect using vertex height for flexibility
@@ -638,8 +635,7 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
           float flexibilityFactor = vertexHeight / bladeLength;
           flexibilityFactor = pow(flexibilityFactor, 1.5); // Curve the flexibility for more natural bend
           
-          // Apply rotation-based wind bending around the blade BASE - NO STRETCHING!
-          // WHOLE BLADE rotates as one unit around its base
+          // Apply rotation-based wind bending around the blade BASE
           // Use wind direction to determine rotation axis and amount
           
           // Convert wind direction to rotation components
@@ -650,11 +646,11 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
           mat3 rotX = rotateX(windRotationX);
           mat3 rotY = rotateY(windRotationY);
           
-          // Rotate around the blade BASE (Y=0) - ALL vertices rotate the same amount
+          // Rotate around the blade BASE (Y=0)
           vec3 basePoint = vec3(0.0, 0.0, 0.0); // Blade base
           vec3 offsetFromBase = transformed - basePoint;
           
-          // Apply rotations around the base - SAME rotation for all vertices
+          // Apply rotations around the base
           offsetFromBase = rotY * offsetFromBase;
           offsetFromBase = rotX * offsetFromBase;
           
