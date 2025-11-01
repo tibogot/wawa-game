@@ -56,6 +56,10 @@ interface MaterialConfig {
   roughnessTip?: number;
   fresnelPower?: number;
   roughnessIntensity?: number;
+  // View Thickening controls (v22 addition)
+  enableViewThickenDebug?: boolean;
+  viewThickenPower?: number;
+  viewThickenStrength?: number;
 }
 
 export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
@@ -120,6 +124,10 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
       roughnessTip: config.roughnessTip ?? 0.1,
       fresnelPower: config.fresnelPower ?? 3.0,
       roughnessIntensity: config.roughnessIntensity ?? 1.0,
+      // View thickening cache key
+      enableViewThickenDebug: !!config.enableViewThickenDebug,
+      viewThickenPower: config.viewThickenPower ?? 4.0,
+      viewThickenStrength: config.viewThickenStrength ?? 0.8,
     });
   }, []);
 
@@ -412,6 +420,17 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
         value: config.roughnessIntensity ?? 1.0,
       };
 
+      // View Thickening uniforms
+      shader.uniforms.u_enableViewThickenDebug = {
+        value: config.enableViewThickenDebug ?? false,
+      };
+      shader.uniforms.u_viewThickenPower = {
+        value: config.viewThickenPower ?? 4.0,
+      };
+      shader.uniforms.u_viewThickenStrength = {
+        value: config.viewThickenStrength ?? 0.8,
+      };
+
       // Ambient Occlusion uniforms
       shader.uniforms.u_enableAmbientOcclusion = {
         value: config.enableAmbientOcclusion,
@@ -483,7 +502,7 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
         float viewDotNormal = clamp(dot(normalize(grassFaceNormal.xz), normalize(viewDir.xz)), 0.0, 1.0);
         
         // Calculate thickening factor: high when edge-on (low dot), low when facing camera
-        float viewSpaceThickenFactor = pow(1.0 - viewDotNormal, 4.0);
+        float viewSpaceThickenFactor = pow(1.0 - viewDotNormal, u_viewThickenPower);
         
         // Thin out again when perfectly orthogonal to avoid visual artifacts
         viewSpaceThickenFactor *= smoothstep(0.0, 0.2, viewDotNormal);
@@ -493,7 +512,7 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
         float grassWidth = abs(position.x);
         
         // Apply thickening by pushing vertices outward along X axis in local space
-        transformed.x += viewSpaceThickenFactor * xDirection * grassWidth * 0.8;
+        transformed.x += viewSpaceThickenFactor * xDirection * grassWidth * u_viewThickenStrength;
       `;
 
       // Always add wind functions (runtime-gated) and player interaction helpers
@@ -515,6 +534,8 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
           uniform float u_windNoiseScale;
           uniform float u_windNoiseSpeed;
           uniform float u_windNoiseAmplitude;
+          uniform float u_viewThickenPower;
+          uniform float u_viewThickenStrength;
           
           // Instanced attribute for wind influence (per blade)
           attribute float windInfluence;
@@ -805,6 +826,11 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
           uniform float u_gradientShaping;
           uniform bool u_enableDebugShader;
           
+          // View Thickening uniforms
+          uniform bool u_enableViewThickenDebug;
+          uniform float u_viewThickenPower;
+          uniform float u_viewThickenStrength;
+          
           // Contact Shadow function - simulates ground shadows
           float getContactShadow(vec3 worldPos, vec3 lightDir) {
             float shadow = 1.0;
@@ -865,6 +891,25 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
           vec3 worldPos = vWorldPosition;
           float contactShadow = getContactShadow(worldPos, lightDir);
           diffuseColor.rgb *= contactShadow;
+          
+          // View Thickening Debug Visualization
+          if (u_enableViewThickenDebug) {
+            // Simplified debug visualization using view direction
+            vec3 viewDir = normalize(cameraPosition - worldPos);
+            
+            // Use simplified approach: visualize based on view angle to grass blade
+            // Since we can't access the exact face normal in fragment shader, 
+            // we'll visualize a simplified approximation
+            vec3 grassFaceNormal = normalize(vec3(1.0, 0.0, 0.0)); // Simplified for debug
+            float viewDotNormal = clamp(dot(normalize(grassFaceNormal.xz), normalize(viewDir.xz)), 0.0, 1.0);
+            
+            // Calculate thickening factor
+            float viewSpaceThickenFactor = pow(1.0 - viewDotNormal, u_viewThickenPower);
+            viewSpaceThickenFactor *= smoothstep(0.0, 0.2, viewDotNormal);
+            
+            // Visualize as grayscale - brighter = more thickening
+            diffuseColor.rgb = vec3(viewSpaceThickenFactor);
+          }
           
           // Environment Map reflections (v22) - removed, causes shader errors
           // Will re-add after debugging
@@ -990,10 +1035,11 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
         `
       );
 
-      // Debug: output final fragment shader once
+      // Debug: output shaders once
       if (!(newMaterial as any)._loggedFragment) {
         (newMaterial as any)._loggedFragment = true;
         try {
+          console.log("[Grass22] Vertex shader:\n", shader.vertexShader);
           console.log("[Grass22] Fragment shader:\n", shader.fragmentShader);
         } catch {}
       }

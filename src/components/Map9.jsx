@@ -2,6 +2,8 @@ import { useRef, useState, useCallback, useMemo, forwardRef } from "react";
 import * as THREE from "three";
 import { ProceduralTerrain5 } from "./ProceduralTerrain5";
 import { ProceduralTerrain6 } from "./ProceduralTerrain6";
+import { ProceduralTerrain7 } from "./ProceduralTerrain7";
+import { ProceduralTerrain8 } from "./ProceduralTerrain8";
 import { SimonDevGrass21 } from "./SimonDevGrass21/SimonDevGrass21";
 import { SimonDevGrass22 } from "./SimonDevGrass22/SimonDevGrass22";
 import { useSimonDevGrass21Controls } from "./useSimonDevGrass21Controls";
@@ -35,7 +37,7 @@ import { ShorelineEffect } from "./ShorelineEffect";
 import { useShorelineEffectControls } from "./useShorelineEffectControls";
 import { ImpostorForest } from "./ImpostorForest";
 import { useImpostorForestControls } from "./useImpostorForestControls";
-import { Lake } from "./Lake";
+// import { Lake } from "./Lake";
 
 export const Map9 = forwardRef(
   (
@@ -278,7 +280,7 @@ export const Map9 = forwardRef(
     return (
       <group ref={group} {...props}>
         <CloudSystem />
-        <ProceduralTerrain6
+        <ProceduralTerrain8
           onTerrainReady={onTerrainReady}
           onHeightmapReady={handleHeightmapReady}
         />
@@ -558,8 +560,8 @@ export const Map9 = forwardRef(
             lodDistances={{ mid: lodMid, low: lodFar }}
           />
         )}
-        {/* Lake */}
-        <Lake position={[0, -5, 0]} />
+
+        {/* <Lake position={[0, -5, 0]} /> */}
       </group>
     );
   }

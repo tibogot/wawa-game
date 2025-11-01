@@ -289,6 +289,31 @@ export const useSimonDevGrass22Controls = () => {
           },
           { collapsed: true }
         ),
+
+        // View Thickening controls
+        viewThickening: folder(
+          {
+            enableViewThickenDebug: {
+              value: false,
+              label: "🔍 Debug View Thickening",
+            },
+            viewThickenPower: {
+              value: 4.0,
+              min: 1.0,
+              max: 8.0,
+              step: 0.1,
+              label: "📊 Thicken Curve Power",
+            },
+            viewThickenStrength: {
+              value: 0.8,
+              min: 0.0,
+              max: 2.0,
+              step: 0.05,
+              label: "💪 Thicken Strength",
+            },
+          },
+          { collapsed: true }
+        ),
       },
       { collapsed: true }
     ),

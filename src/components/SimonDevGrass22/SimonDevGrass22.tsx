@@ -76,6 +76,10 @@ export const SimonDevGrass22 = ({
     roughnessTip,
     fresnelPower,
     roughnessIntensity,
+    // view thickening
+    enableViewThickenDebug,
+    viewThickenPower,
+    viewThickenStrength,
   } = useSimonDevGrass22Controls();
 
   if (!simonDevGrass22Enabled) return null;
@@ -174,6 +178,10 @@ export const SimonDevGrass22 = ({
     roughnessTip: roughnessTip,
     fresnelPower: fresnelPower,
     roughnessIntensity: roughnessIntensity,
+    // View Thickening controls (v22 addition)
+    enableViewThickenDebug: enableViewThickenDebug,
+    viewThickenPower: viewThickenPower,
+    viewThickenStrength: viewThickenStrength,
   });
 
   // Create instances using the optimized instances component
