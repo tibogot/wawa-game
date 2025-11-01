@@ -776,7 +776,7 @@ export const ProceduralTerrain8 = ({
   // Load all terrain textures
   const groundTexture = useLoader(
     TextureLoader,
-    "/textures/Ground036_1K-JPG_Color.jpg"
+    "/textures/Grass005_1K-JPG_Color.jpg"
   );
   const normalMapTexture = useLoader(
     TextureLoader,
