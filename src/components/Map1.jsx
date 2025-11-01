@@ -17,6 +17,7 @@ import { FlowingLinesSimple } from "./FlowingLinesSimple";
 import { WindFlag } from "./WindFlag";
 import { useWindFlagControls } from "./useWindFlagControls";
 import { RipplePlane } from "./RipplePlane";
+import { FloatingLeaves2 } from "./FloatingLeaves2";
 import * as THREE from "three";
 
 export const Map1 = ({
@@ -411,6 +412,12 @@ export const Map1 = ({
           opacity={ripplePlaneOpacity}
         />
       )}
+
+      {/* Floating Leaves 2 - Follows character position */}
+      <FloatingLeaves2
+        characterPosition={characterPosition || fallbackPosition}
+        getTerrainHeight={getGroundHeight}
+      />
     </group>
   );
 };
