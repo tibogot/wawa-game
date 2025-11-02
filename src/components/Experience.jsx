@@ -98,6 +98,7 @@ export const Experience = () => {
   // Track character position and velocity for dynamic effects
   const characterPositionVector = useRef(new THREE.Vector3());
   const characterVelocity = useRef(new THREE.Vector3());
+  const characterRotation = useRef(0);
   const { map, cameraMode } = useControls("Map", {
     map: {
       value: "map1",
@@ -105,7 +106,7 @@ export const Experience = () => {
     },
     cameraMode: {
       value: "follow",
-      options: ["follow", "orbit"],
+      options: ["follow", "orbit", "follow-orbit"],
       label: "Camera Mode",
     },
   });
@@ -489,6 +490,9 @@ export const Experience = () => {
             }}
             onVelocityChange={(vel) => {
               characterVelocity.current.set(vel[0], vel[1], vel[2]);
+            }}
+            onRotationChange={(rot) => {
+              characterRotation.current = rot;
             }}
           />
         )}

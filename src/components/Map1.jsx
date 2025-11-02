@@ -11,6 +11,7 @@ import { useSimonDevGrass21Controls } from "./useSimonDevGrass21Controls";
 import { useSimonDevGrass22Controls } from "./useSimonDevGrass22Controls";
 import { useImpostorForestControls } from "./useImpostorForestControls";
 import { useLeafPileMountainControls } from "./useLeafPileMountainControls";
+import { useInstancedTreesControls } from "./useInstancedTreesControls";
 import { useLensFlareControls } from "./useLensFlareControls";
 import LensFlare from "./LensFlare";
 import { FlowingLinesSimple } from "./FlowingLinesSimple";
@@ -19,6 +20,8 @@ import { useWindFlagControls } from "./useWindFlagControls";
 import { RipplePlane } from "./RipplePlane";
 import { FloatingLeaves2 } from "./FloatingLeaves2";
 import { Skybox } from "./Skybox";
+import { Tree } from "./Tree";
+import { InstancedTrees } from "./InstancedTrees";
 import * as THREE from "three";
 
 export const Map1 = ({
@@ -77,6 +80,27 @@ export const Map1 = ({
     leafPileMountainSwirlStrength,
     leafPileMountainExplosionStrength,
   } = useLeafPileMountainControls();
+
+  // Get InstancedTrees controls
+  const {
+    instancedTreesEnabled,
+    instancedTreeCount,
+    instancedPositionX,
+    instancedPositionY,
+    instancedPositionZ,
+    instancedRadius,
+    instancedMinRadius,
+    scaleRangeMin,
+    scaleRangeMax,
+    castShadow,
+    receiveShadow,
+    enableTransparentSorting,
+    enableBVH,
+    bvhMargin,
+    enableViewThickening,
+    viewThickenPower,
+    viewThickenStrength,
+  } = useInstancedTreesControls();
 
   // Get LensFlare controls
   const {
@@ -430,6 +454,39 @@ export const Map1 = ({
         characterPosition={characterPosition || fallbackPosition}
         getTerrainHeight={getGroundHeight}
       />
+
+      {/* Tree */}
+      <Tree
+        position={[10, 0, 10]}
+        scale={1}
+        enabled={true}
+        getTerrainHeight={getGroundHeight}
+      />
+
+      {/* Instanced Trees - Using InstancedMesh2 */}
+      {instancedTreesEnabled && (
+        <InstancedTrees
+          count={instancedTreeCount}
+          position={[
+            instancedPositionX,
+            instancedPositionY,
+            instancedPositionZ,
+          ]}
+          radius={instancedRadius}
+          minRadius={instancedMinRadius}
+          scaleRange={[scaleRangeMin, scaleRangeMax]}
+          enabled={instancedTreesEnabled}
+          getTerrainHeight={getGroundHeight}
+          enableBVH={enableBVH}
+          bvhMargin={bvhMargin}
+          castShadow={castShadow}
+          receiveShadow={receiveShadow}
+          enableTransparentSorting={enableTransparentSorting}
+          enableViewThickening={enableViewThickening}
+          viewThickenPower={viewThickenPower}
+          viewThickenStrength={viewThickenStrength}
+        />
+      )}
     </group>
   );
 };

@@ -39,6 +39,8 @@ import { ShorelineEffect } from "./ShorelineEffect";
 import { useShorelineEffectControls } from "./useShorelineEffectControls";
 import { ImpostorForest } from "./ImpostorForest";
 import { useImpostorForestControls } from "./useImpostorForestControls";
+import { InstancedTrees } from "./InstancedTrees";
+import { useInstancedTreesControls } from "./useInstancedTreesControls";
 // import { Lake } from "./Lake";
 
 export const Map9 = forwardRef(
@@ -240,6 +242,27 @@ export const Map9 = forwardRef(
       lodMid,
       lodFar,
     } = useImpostorForestControls();
+
+    // Get InstancedTrees controls
+    const {
+      instancedTreesEnabled,
+      instancedTreeCount,
+      instancedPositionX,
+      instancedPositionY,
+      instancedPositionZ,
+      instancedRadius,
+      instancedMinRadius,
+      scaleRangeMin,
+      scaleRangeMax,
+      castShadow,
+      receiveShadow,
+      enableTransparentSorting,
+      enableBVH,
+      bvhMargin,
+      enableViewThickening,
+      viewThickenPower,
+      viewThickenStrength,
+    } = useInstancedTreesControls();
 
     // Create stable fallback vectors
     const fallbackPosition = useMemo(() => new THREE.Vector3(0, 0, 0), []);
@@ -578,6 +601,31 @@ export const Map9 = forwardRef(
             treeCount={treeCount}
             getTerrainHeight={getGroundHeight}
             lodDistances={{ mid: lodMid, low: lodFar }}
+          />
+        )}
+
+        {/* Instanced Trees - Using InstancedMesh2 */}
+        {instancedTreesEnabled && heightmapLookup && (
+          <InstancedTrees
+            count={instancedTreeCount}
+            position={[
+              instancedPositionX,
+              instancedPositionY,
+              instancedPositionZ,
+            ]}
+            radius={instancedRadius}
+            minRadius={instancedMinRadius}
+            scaleRange={[scaleRangeMin, scaleRangeMax]}
+            enabled={instancedTreesEnabled}
+            getTerrainHeight={getGroundHeight}
+            enableBVH={enableBVH}
+            bvhMargin={bvhMargin}
+            castShadow={castShadow}
+            receiveShadow={receiveShadow}
+            enableTransparentSorting={enableTransparentSorting}
+            enableViewThickening={enableViewThickening}
+            viewThickenPower={viewThickenPower}
+            viewThickenStrength={viewThickenStrength}
           />
         )}
 

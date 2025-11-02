@@ -36,6 +36,7 @@ interface Props {
   collider?: THREE.Mesh | null;
   onPositionChange?: (position: [number, number, number]) => void;
   onVelocityChange?: (velocity: [number, number, number]) => void;
+  onRotationChange?: (rotation: number) => void;
 }
 
 export const GodotCharacterHybrid = ({
@@ -44,6 +45,7 @@ export const GodotCharacterHybrid = ({
   collider = null,
   onPositionChange,
   onVelocityChange,
+  onRotationChange,
 }: Props) => {
   // Access Rapier world for raycasting dynamic objects
   const { world, rapier } = useRapier();
@@ -58,6 +60,7 @@ export const GodotCharacterHybrid = ({
     cameraZ,
     targetZ,
     cameraLerpSpeed,
+    mouseSensitivity,
     capsuleHeight,
     capsuleRadius,
   } = useControls("🎮 GODOT CHARACTER", {
@@ -82,6 +85,13 @@ export const GodotCharacterHybrid = ({
         cameraZ: { value: -5.6, min: -10, max: 2, step: 0.1 },
         targetZ: { value: 5, min: -2, max: 5, step: 0.1 },
         cameraLerpSpeed: { value: 0.1, min: 0.01, max: 0.5, step: 0.01 },
+        mouseSensitivity: {
+          value: 0.003,
+          min: 0.001,
+          max: 0.01,
+          step: 0.001,
+          label: "Mouse Sensitivity",
+        },
       },
       { collapsed: true }
     ),
@@ -129,6 +139,10 @@ export const GodotCharacterHybrid = ({
   const isCrouchingRef = useRef(false);
   const crouchTransitioningRef = useRef(false);
   const ceilingClearanceTimer = useRef(0);
+
+  // Mouse orbit for follow-orbit camera mode
+  const mouseOrbitOffset = useRef(0); // Horizontal orbit offset (0 = default behind character)
+  const mouseVerticalOffset = useRef(0); // Vertical orbit offset (0 = default height)
 
   // BVH temps
   const tempBox = useRef(new Box3());
@@ -187,6 +201,52 @@ export const GodotCharacterHybrid = ({
       window.removeEventListener("contextmenu", handleContextMenu);
     };
   }, [combatMode]);
+
+  // Mouse orbit controls for follow-orbit camera mode
+  useEffect(() => {
+    if (cameraMode !== "follow-orbit") {
+      return;
+    }
+
+    // Reset offsets when entering follow-orbit mode
+    // Screen center always = camera behind character (0 offset)
+    mouseOrbitOffset.current = 0;
+    mouseVerticalOffset.current = 0;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (cameraMode !== "follow-orbit") return;
+
+      // Always use screen center as the reference point
+      // CURSOR CENTER = camera at back of character (0 offset)
+      const screenCenterX = window.innerWidth / 2;
+      const screenCenterY = window.innerHeight / 2;
+
+      // Calculate mouse position relative to SCREEN CENTER
+      // Screen center = behind character (0 offset)
+      // Mouse right of screen center = positive offset = camera orbits right
+      // Mouse left of screen center = negative offset = camera orbits left
+      const mouseXRelativeToCenter = e.clientX - screenCenterX;
+      const mouseYRelativeToCenter = e.clientY - screenCenterY;
+
+      // Convert screen position relative to center to camera orbit offset
+      // Screen center (mouseXRelativeToCenter = 0) = camera behind (0 offset)
+      mouseOrbitOffset.current = mouseXRelativeToCenter * mouseSensitivity;
+      mouseVerticalOffset.current = -mouseYRelativeToCenter * mouseSensitivity;
+
+      // Clamp vertical offset to prevent camera from going too high/low
+      mouseVerticalOffset.current = MathUtils.clamp(
+        mouseVerticalOffset.current,
+        -Math.PI / 3, // ~60 degrees down
+        Math.PI / 3 // ~60 degrees up
+      );
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+    };
+  }, [cameraMode, mouseSensitivity]);
 
   // BVH-based ground detection - checks surface normal (STATIC GEOMETRY)
   const checkGroundedBVH = () => {
@@ -530,18 +590,31 @@ export const GodotCharacterHybrid = ({
       }
 
       if (movement.x !== 0 || movement.z !== 0) {
+        // Calculate base movement direction from input
+        const baseMovementAngle = movement.walkBackwardMode
+          ? Math.atan2(movement.x, 1)
+          : Math.atan2(movement.x, movement.z);
+
+        // In follow-orbit mode, use camera rotation (including mouse orbit) for movement direction
+        // Otherwise use character rotation
+        const movementRotation =
+          cameraMode === "follow-orbit"
+            ? rotationTarget.current +
+              mouseOrbitOffset.current +
+              baseMovementAngle
+            : rotationTarget.current + baseMovementAngle;
+
+        let intendedVelX = Math.sin(movementRotation) * speed;
+        let intendedVelZ = Math.cos(movementRotation) * speed;
+
+        // Character rotation should ONLY be based on movement input, NOT camera orbit
+        // Camera orbit affects movement direction in world space, but character faces input direction
+        // Character rotation is ALWAYS the same regardless of camera mode
         if (movement.walkBackwardMode) {
           characterRotationTarget.current = Math.atan2(movement.x, 1);
         } else {
           characterRotationTarget.current = Math.atan2(movement.x, movement.z);
         }
-
-        let intendedVelX =
-          Math.sin(rotationTarget.current + characterRotationTarget.current) *
-          speed;
-        let intendedVelZ =
-          Math.cos(rotationTarget.current + characterRotationTarget.current) *
-          speed;
 
         if (movement.walkBackwardMode && movement.z < 0) {
           intendedVelX = -intendedVelX;
@@ -644,10 +717,28 @@ export const GodotCharacterHybrid = ({
       }
 
       if (character.current) {
+        // Character rotation should be independent of camera orbit
+        // In follow-orbit mode, we need to subtract the camera orbit offset
+        // so the character stays in place when camera orbits
+        let targetRotation = characterRotationTarget.current;
+        if (cameraMode === "follow-orbit") {
+          // Counter-rotate to cancel out camera orbit effect
+          // Character rotation should be relative to base camera, not orbiting camera
+          targetRotation =
+            characterRotationTarget.current - mouseOrbitOffset.current;
+        }
+
         character.current.rotation.y = lerpAngle(
           character.current.rotation.y,
-          characterRotationTarget.current,
+          targetRotation,
           0.1
+        );
+      }
+
+      // Notify rotation change for third-person camera
+      if (onRotationChange) {
+        onRotationChange(
+          rotationTarget.current + characterRotationTarget.current
         );
       }
 
@@ -655,12 +746,25 @@ export const GodotCharacterHybrid = ({
     }
 
     // CAMERA
-    if (cameraMode === "follow") {
+    if (cameraMode === "follow" || cameraMode === "follow-orbit") {
+      // Base rotation follows character movement
+      const baseRotation = rotationTarget.current;
+
+      // For follow-orbit, add mouse orbit offset to camera rotation ONLY
+      // The container holds camera position, so camera can orbit without affecting character
+      const finalRotation =
+        cameraMode === "follow-orbit"
+          ? baseRotation + mouseOrbitOffset.current
+          : baseRotation;
+
       container.current.rotation.y = MathUtils.lerp(
         container.current.rotation.y,
-        rotationTarget.current,
+        finalRotation,
         cameraLerpSpeed
       );
+
+      // IMPORTANT: character rotation is NOT affected by camera orbit
+      // character.current.rotation.y is set separately based on movement only
 
       cameraPosition.current.getWorldPosition(cameraWorldPosition.current);
 
@@ -684,6 +788,15 @@ export const GodotCharacterHybrid = ({
             cameraLookAtWorldPosition.current,
             cameraLerpSpeed
           );
+        }
+
+        // For follow-orbit, adjust camera height based on vertical mouse offset
+        if (
+          cameraMode === "follow-orbit" &&
+          mouseVerticalOffset.current !== 0
+        ) {
+          const verticalOffset = Math.sin(mouseVerticalOffset.current) * 3;
+          camera.position.y += verticalOffset * 0.1; // Smoothly adjust camera height
         }
 
         camera.lookAt(cameraLookAt.current);
