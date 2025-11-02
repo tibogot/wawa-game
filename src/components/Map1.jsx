@@ -4,11 +4,13 @@ import { useControls, folder } from "leva";
 import { DynamicLeaves as DynamicLeaves3 } from "./DynamicLeaves3";
 import { SimonDevGrass21 } from "./SimonDevGrass21/SimonDevGrass21";
 import { SimonDevGrass22 } from "./SimonDevGrass22/SimonDevGrass22";
+import { SimonDevGrass23 } from "./SimonDevGrass23/SimonDevGrass23";
 import { ImpostorForest } from "./ImpostorForest";
 import { LeafPileMountain } from "./LeafPileMountain";
 import { useDynamicLeaves3Controls } from "./useDynamicLeaves3Controls";
 import { useSimonDevGrass21Controls } from "./useSimonDevGrass21Controls";
 import { useSimonDevGrass22Controls } from "./useSimonDevGrass22Controls";
+import { useSimonDevGrass23Controls } from "./useSimonDevGrass23Controls";
 import { useImpostorForestControls } from "./useImpostorForestControls";
 import { useLeafPileMountainControls } from "./useLeafPileMountainControls";
 import { useInstancedTreesControls } from "./useInstancedTreesControls";
@@ -53,6 +55,8 @@ export const Map1 = ({
   const { simonDevGrass21Enabled } = useSimonDevGrass21Controls();
   // Get SimonDevGrass22 controls (separate folder under FOLIAGE)
   const { simonDevGrass22Enabled } = useSimonDevGrass22Controls();
+  // Get SimonDevGrass23 controls (separate folder under FOLIAGE)
+  const { simonDevGrass23Enabled } = useSimonDevGrass23Controls();
 
   // Get ImpostorForest controls
   const {
@@ -347,6 +351,18 @@ export const Map1 = ({
       {/* SimonDevGrass22 Grass System */}
       {simonDevGrass22Enabled && (
         <SimonDevGrass22
+          areaSize={200}
+          mapSize={200}
+          grassHeight={1.0}
+          grassScale={1.0}
+          getGroundHeight={getGroundHeight}
+          characterPosition={characterPosition || fallbackPosition}
+        />
+      )}
+
+      {/* SimonDevGrass23 Grass System */}
+      {simonDevGrass23Enabled && (
+        <SimonDevGrass23
           areaSize={200}
           mapSize={200}
           grassHeight={1.0}
