@@ -114,31 +114,8 @@ export const InstancedTrees = ({
         `   Total for ${count} trees: ${totalTriangles.toFixed(0)} triangles`
       );
 
-      // ========== STEP 2: Generate tree positions ==========
-      const positions = [];
-
-      for (let i = 0; i < count; i++) {
-        // Random position in ring (donut shape)
-        const angle = Math.random() * Math.PI * 2;
-        const distance = minRadius + Math.random() * (radius - minRadius);
-
-        const x = position[0] + Math.cos(angle) * distance;
-        const z = position[2] + Math.sin(angle) * distance;
-
-        // Sample terrain height if available
-        let y = position[1];
-        if (getTerrainHeight) {
-          y = getTerrainHeight(x, z);
-        }
-
-        positions.push(new THREE.Vector3(x, y, z));
-      }
-
-      console.log(
-        `   ✅ Generated ${positions.length.toLocaleString()} positions`
-      );
-
-      // ========== STEP 3: Calculate bounding box for terrain positioning ==========
+      // ========== STEP 2: Calculate bounding box for terrain positioning ==========
+      // MUST be done BEFORE generating transforms (needed for terrain height adjustment)
       // Use the same logic as Tree component - calculate bottom offset without scale first
       let treeBottomOffset = 0;
       if (getTerrainHeight) {
@@ -152,6 +129,44 @@ export const InstancedTrees = ({
         tempGroup.clear();
         console.log(`   📐 Tree bottom offset: ${treeBottomOffset.toFixed(2)}`);
       }
+
+      // ========== STEP 3: Pre-generate ALL tree transformation data ==========
+      // CRITICAL: Generate ALL random values ONCE and store them
+      // This ensures trunk and leaves use EXACTLY the same transformations
+      const treeTransforms = [];
+
+      for (let i = 0; i < count; i++) {
+        // Random position in ring (donut shape)
+        const angle = Math.random() * Math.PI * 2;
+        const distance = minRadius + Math.random() * (radius - minRadius);
+
+        const x = position[0] + Math.cos(angle) * distance;
+        const z = position[2] + Math.sin(angle) * distance;
+
+        // Generate random scale and rotation ONCE and store them
+        const randomScale =
+          Math.random() * (scaleRange[1] - scaleRange[0]) + scaleRange[0];
+        const randomRotation = Math.random() * Math.PI * 2;
+
+        // Calculate terrain-adjusted Y position (using pre-calculated treeBottomOffset)
+        let finalY = position[1];
+        if (getTerrainHeight) {
+          const terrainY = getTerrainHeight(x, z);
+          const scaledBottomOffset = treeBottomOffset * randomScale;
+          finalY = terrainY - scaledBottomOffset;
+        }
+
+        // Store ALL transformation data for this tree
+        treeTransforms.push({
+          position: new THREE.Vector3(x, finalY, z),
+          scale: randomScale,
+          rotation: randomRotation,
+        });
+      }
+
+      console.log(
+        `   ✅ Generated ${treeTransforms.length.toLocaleString()} tree transforms (positions, scales, rotations)`
+      );
 
       // ========== STEP 4: Create SEPARATE InstancedMesh2 for EACH mesh (trunk + leaves) ==========
       const instancedMeshes = [];
@@ -246,35 +261,19 @@ export const InstancedTrees = ({
           `   ☀️ Shadows: cast=${castShadow}, receive=${receiveShadow}`
         );
 
-        // Add all tree instances with randomization
-        // Use the same positioning logic as Tree component for perfect placement
+        // Add all tree instances using PRE-GENERATED transformation data
+        // CRITICAL: Both trunk and leaves use the SAME stored transformations
+        // This ensures perfect synchronization - no desync issues!
         instancedMesh.addInstances(count, (obj, index) => {
-          const pos = positions[index];
+          // Use the PRE-GENERATED transform data (same for trunk and leaves)
+          const transform = treeTransforms[index];
 
-          // Random scale within range (set before position calculations)
-          const randomScale =
-            Math.random() * (scaleRange[1] - scaleRange[0]) + scaleRange[0];
-          obj.scale.setScalar(randomScale);
+          // Apply the stored position, scale, and rotation
+          obj.position.copy(transform.position);
+          obj.scale.setScalar(transform.scale);
 
-          // Calculate terrain height and adjust position (like Tree component)
-          if (getTerrainHeight) {
-            // Get terrain height at this position
-            const terrainY = getTerrainHeight(pos.x, pos.z);
-
-            // Calculate the bottom offset for this scaled tree (like Tree component)
-            // Tree component: adjustedY = terrainY - bottomY (where bottomY is from scaled bbox)
-            // For instanced, we approximate: scaled bottom = unscaled bottom * scale
-            const scaledBottomOffset = treeBottomOffset * randomScale;
-
-            // Set position like Tree component: adjustedY = terrainY - scaledBottomOffset
-            obj.position.set(pos.x, terrainY - scaledBottomOffset, pos.z);
-          } else {
-            // No terrain, use position as-is
-            obj.position.copy(pos);
-          }
-
-          // Random rotation around Y axis (after position is set)
-          obj.rotateY(Math.random() * Math.PI * 2);
+          // Use rotateY directly (like OctahedralForest) - works with InstancedMesh2
+          obj.rotateY(transform.rotation);
 
           obj.updateMatrix();
         });

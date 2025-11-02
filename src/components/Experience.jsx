@@ -146,6 +146,7 @@ export const Experience = () => {
     shadowCameraNear,
     shadowCameraFar,
     followCharacter,
+    shadowFollowRadius,
     showTestSphere,
   } = useLightsControls();
 
@@ -317,8 +318,9 @@ export const Experience = () => {
         light.target.updateMatrixWorld();
       }
 
-      // Reduce frustum bounds for high-quality shadows (smaller = sharper)
-      const tightBounds = 15;
+      // Dynamic frustum bounds - increase radius for better coverage
+      // Keep shadows sharp at character but extend to cover nearby objects
+      const tightBounds = shadowFollowRadius;
       shadowCamera.left = -tightBounds;
       shadowCamera.right = tightBounds;
       shadowCamera.top = tightBounds;

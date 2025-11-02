@@ -107,13 +107,14 @@ export const useFrustumCullingSystem = ({
     }
   }, [camera, enabled, updateInterval, debugMode]);
 
-  // Check if tile is visible
+  // Check if tile is visible (optimized - assumes frustum already updated for batch operations)
   const isTileVisible = useCallback(
     (
       centerX: number,
       centerZ: number,
       tileSize: number,
-      maxHeight: number = 10
+      maxHeight: number = 10,
+      skipFrustumUpdate: boolean = false // Skip frustum update if already done in batch
     ): boolean => {
       if (!enabled) return true;
 
@@ -128,7 +129,10 @@ export const useFrustumCullingSystem = ({
       }
 
       // Second check: Frustum culling
-      updateFrustum();
+      // Only update frustum if not in a batch operation (when skipFrustumUpdate is false)
+      if (!skipFrustumUpdate) {
+        updateFrustum();
+      }
       const bounds = calculateTileBounds(centerX, centerZ, tileSize, maxHeight);
       const boundingBox = new THREE.Box3(bounds.min, bounds.max);
 
@@ -137,7 +141,7 @@ export const useFrustumCullingSystem = ({
     [enabled, updateFrustum, calculateTileBounds, maxCullingDistance, camera]
   );
 
-  // Batch cull multiple tiles
+  // Batch cull multiple tiles (optimized - single frustum update for all tiles)
   const cullTiles = useCallback(
     (
       tiles: Array<{
@@ -155,18 +159,35 @@ export const useFrustumCullingSystem = ({
         };
       }
 
-      // Update frustum
+      // Update frustum once for the entire batch
       updateFrustum();
+      const cameraPos = camera.position;
 
       const visible: string[] = [];
       const culled: string[] = [];
 
+      // Process all tiles with pre-computed frustum
       tiles.forEach((tile) => {
+        // Fast distance check first
+        const distance = Math.sqrt(
+          Math.pow(tile.centerX - cameraPos.x, 2) +
+            Math.pow(tile.centerZ - cameraPos.z, 2)
+        );
+
+        if (distance > maxCullingDistance) {
+          culled.push(tile.id);
+          culledTilesRef.current.add(tile.id);
+          visibleTilesRef.current.delete(tile.id);
+          return;
+        }
+
+        // Frustum check (skip update since we already did it)
         const isVisible = isTileVisible(
           tile.centerX,
           tile.centerZ,
           tile.tileSize,
-          tile.maxHeight || 10
+          tile.maxHeight || 10,
+          true // Skip frustum update - already done above
         );
 
         if (isVisible) {
@@ -196,7 +217,14 @@ export const useFrustumCullingSystem = ({
 
       return { visible, culled };
     },
-    [enabled, updateFrustum, isTileVisible, debugMode]
+    [
+      enabled,
+      updateFrustum,
+      isTileVisible,
+      debugMode,
+      maxCullingDistance,
+      camera,
+    ]
   );
 
   // Get culling statistics

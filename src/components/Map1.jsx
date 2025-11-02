@@ -81,6 +81,19 @@ export const Map1 = ({
     leafPileMountainExplosionStrength,
   } = useLeafPileMountainControls();
 
+  // Get Tree control (single tree component)
+  const { treeEnabled } = useControls("🌿 FOLIAGE", {
+    tree: folder(
+      {
+        treeEnabled: {
+          value: false,
+          label: "🌲 Enable Single Tree",
+        },
+      },
+      { collapsed: true }
+    ),
+  });
+
   // Get InstancedTrees controls
   const {
     instancedTreesEnabled,
@@ -456,12 +469,14 @@ export const Map1 = ({
       />
 
       {/* Tree */}
-      <Tree
-        position={[10, 0, 10]}
-        scale={1}
-        enabled={true}
-        getTerrainHeight={getGroundHeight}
-      />
+      {treeEnabled && (
+        <Tree
+          position={[10, 0, 10]}
+          scale={1}
+          enabled={true}
+          getTerrainHeight={getGroundHeight}
+        />
+      )}
 
       {/* Instanced Trees - Using InstancedMesh2 */}
       {instancedTreesEnabled && (

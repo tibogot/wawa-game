@@ -88,7 +88,7 @@ export const useLightsControls = () => {
           label: "Position [X, Y, Z]",
         },
         shadowMapSize: {
-          value: 2048,
+          value: 4096,
           options: [512, 1024, 2048, 4096, 8192],
           label: "Shadow Map Size",
         },
@@ -107,7 +107,7 @@ export const useLightsControls = () => {
           label: "Normal Bias",
         },
         shadowRadius: {
-          value: 4,
+          value: 8,
           min: 0,
           max: 20,
           step: 1,
@@ -116,6 +116,13 @@ export const useLightsControls = () => {
         followCharacter: {
           value: true,
           label: "Follow Character",
+        },
+        shadowFollowRadius: {
+          value: 50,
+          min: 10,
+          max: 200,
+          step: 5,
+          label: "Shadow Follow Radius",
         },
       },
       { collapsed: true }

@@ -47,6 +47,10 @@ export const useOptimizedGrassInstances = ({
   const instancedMeshRef = useRef<THREE.Group | null>(null);
   const hasInitializedRef = useRef(false);
 
+  // Cache for visible tile IDs to avoid recomputing every frame
+  const visibleTileIdsCacheRef = useRef<Set<string>>(new Set());
+  const lastFrustumCullTimeRef = useRef(0);
+
   // Initialize optimization systems
   const adaptiveLOD = useAdaptiveLODSystem();
   const frustumCulling = useFrustumCullingSystem({
@@ -266,13 +270,56 @@ export const useOptimizedGrassInstances = ({
     }
 
     const cameraPos = camera.position;
-    const updateInterval = adaptiveLOD.getUpdateInterval(cameraPos);
     const now = Date.now();
 
-    if (now - lastUpdateTimeRef.current < updateInterval) {
+    // Separate intervals for frustum culling and LOD updates
+    // Frustum culling can be less frequent than LOD updates
+    const frustumCullInterval = Math.max(frustumCullingUpdateInterval, 200); // At least 200ms
+    const lodUpdateInterval = adaptiveLOD.getUpdateInterval(cameraPos);
+
+    // Check if we need to update frustum culling
+    const needsFrustumUpdate =
+      enableFrustumCulling &&
+      now - lastFrustumCullTimeRef.current >= frustumCullInterval;
+
+    // Check if we need to update LOD
+    const needsLODUpdate = now - lastUpdateTimeRef.current >= lodUpdateInterval;
+
+    if (!needsFrustumUpdate && !needsLODUpdate) {
       return;
     }
-    lastUpdateTimeRef.current = now;
+
+    // Update frustum culling cache if needed (less frequent)
+    if (needsFrustumUpdate) {
+      lastFrustumCullTimeRef.current = now;
+
+      // Pre-create tile data structure once (avoid repeated mapping)
+      const tilesWithIds: Array<{
+        id: string;
+        centerX: number;
+        centerZ: number;
+        tileSize: number;
+        maxHeight?: number;
+      }> = [];
+
+      tilesRef.current.forEach((tile, index) => {
+        tilesWithIds.push({
+          id: `tile_${index}`,
+          centerX: tile.centerX,
+          centerZ: tile.centerZ,
+          tileSize: tile.tileSize || config.TILE_SIZE,
+          maxHeight: 10,
+        });
+      });
+
+      // Single frustum culling pass
+      const { visible: visibleTileIds } =
+        frustumCulling.cullTiles(tilesWithIds);
+
+      // Update cache
+      visibleTileIdsCacheRef.current.clear();
+      visibleTileIds.forEach((id) => visibleTileIdsCacheRef.current.add(id));
+    }
 
     // Process LOD updates in batches
     const updateTile = (tile: any, newLOD: string) => {
@@ -315,36 +362,35 @@ export const useOptimizedGrassInstances = ({
       }
     };
 
-    // Apply frustum culling to tiles before LOD updates
-    if (enableFrustumCulling) {
-      const tilesWithIds = tilesRef.current.map((tile, index) => ({
-        ...tile,
-        id: `tile_${index}`,
-      }));
+    // Apply LOD updates using cached visible tiles (no filtering needed)
+    if (needsLODUpdate) {
+      lastUpdateTimeRef.current = now;
 
-      const { visible: visibleTileIds } =
-        frustumCulling.cullTiles(tilesWithIds);
+      if (enableFrustumCulling) {
+        // Use cached visible tiles - single pass, no filtering
+        const visibleTiles: any[] = [];
+        tilesRef.current.forEach((tile, index) => {
+          if (visibleTileIdsCacheRef.current.has(`tile_${index}`)) {
+            visibleTiles.push(tile);
+          }
+        });
 
-      // Filter tiles to only process visible ones
-      const visibleTiles = tilesRef.current.filter((tile, index) =>
-        visibleTileIds.includes(`tile_${index}`)
-      );
-
-      // Process LOD updates only for visible tiles
-      adaptiveLOD.processLODUpdates(
-        visibleTiles,
-        cameraPos,
-        config,
-        updateTile
-      );
-    } else {
-      // Process LOD updates for all tiles if frustum culling is disabled
-      adaptiveLOD.processLODUpdates(
-        tilesRef.current,
-        cameraPos,
-        config,
-        updateTile
-      );
+        // Process LOD updates only for visible tiles
+        adaptiveLOD.processLODUpdates(
+          visibleTiles,
+          cameraPos,
+          config,
+          updateTile
+        );
+      } else {
+        // Process LOD updates for all tiles if frustum culling is disabled
+        adaptiveLOD.processLODUpdates(
+          tilesRef.current,
+          cameraPos,
+          config,
+          updateTile
+        );
+      }
     }
   });
 
