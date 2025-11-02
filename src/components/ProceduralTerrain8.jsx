@@ -427,7 +427,7 @@ function TerrainChunk({
     const material = new THREE.MeshStandardMaterial({
       color: color,
       flatShading: false,
-      roughness: 10, // Lower = shinier, higher = rougher (0.0 to 1.0)
+      roughness: 1.0, // Lower = shinier, higher = rougher (0.0 to 1.0)
       metalness: 0.0,
       envMapIntensity: 0.3,
     });
@@ -1073,7 +1073,7 @@ export const ProceduralTerrain8 = ({
       label: "🖼️ Use Ground Texture",
     },
     textureRepeat: {
-      value: 10.0,
+      value: 60.0,
       min: 1,
       max: 100,
       step: 0.5,

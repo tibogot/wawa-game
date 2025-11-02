@@ -18,6 +18,7 @@ import { WindFlag } from "./WindFlag";
 import { useWindFlagControls } from "./useWindFlagControls";
 import { RipplePlane } from "./RipplePlane";
 import { FloatingLeaves2 } from "./FloatingLeaves2";
+import { Skybox } from "./Skybox";
 import * as THREE from "three";
 
 export const Map1 = ({
@@ -103,6 +104,7 @@ export const Map1 = ({
 
   // Get FlowingLines and RipplePlane controls - Map1 specific
   const {
+    skyboxEnabled,
     flowingLinesEnabled,
     ripplePlaneEnabled,
     ripplePlaneSize,
@@ -117,6 +119,15 @@ export const Map1 = ({
     ripplePlanePositionY,
     ripplePlanePositionZ,
   } = useControls("🗺️ MAP 1", {
+    skybox: folder(
+      {
+        skyboxEnabled: {
+          value: true,
+          label: "🌌 Enable Skybox",
+        },
+      },
+      { collapsed: true }
+    ),
     flowingLines: folder(
       {
         flowingLinesEnabled: {
@@ -234,6 +245,7 @@ export const Map1 = ({
 
   return (
     <group ref={group} {...props}>
+      {skyboxEnabled && <Skybox />}
       <RigidBody type="fixed" colliders="trimesh">
         <mesh
           position={position}

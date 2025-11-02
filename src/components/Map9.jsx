@@ -24,6 +24,8 @@ import { ButterflyParticles } from "./ButterflyParticles";
 import { useButterflyParticlesControls } from "./useButterflyParticlesControls";
 import { Mountain } from "./Mountain";
 import { useMountainControls } from "./useMountainControls";
+import { QuarryRocks } from "./Quarry_rocks";
+import { useQuarryRocksControls } from "./useQuarryRocksControls";
 import { WindFlag } from "./WindFlag";
 import { useWindFlagControls } from "./useWindFlagControls";
 import { DustParticles } from "./DustParticles";
@@ -154,6 +156,14 @@ export const Map9 = forwardRef(
       mountainEmissive,
       mountainEmissiveIntensity,
     } = useMountainControls();
+
+    // Get QuarryRocks controls
+    const {
+      quarryRocksEnabled,
+      quarryRocksPosition,
+      quarryRocksScale,
+      quarryRocksRotation,
+    } = useQuarryRocksControls();
 
     // Get WindFlag controls
     const {
@@ -532,6 +542,16 @@ export const Map9 = forwardRef(
           mountainEmissive={mountainEmissive}
           mountainEmissiveIntensity={mountainEmissiveIntensity}
         />
+        {/* Quarry Rocks */}
+        {heightmapLookup && (
+          <QuarryRocks
+            enabled={quarryRocksEnabled}
+            position={quarryRocksPosition}
+            scale={quarryRocksScale}
+            rotation={quarryRocksRotation}
+            getTerrainHeight={getGroundHeight}
+          />
+        )}
         {/* Shoreline Effect */}
         {heightmapLookup && (
           <ShorelineEffect
