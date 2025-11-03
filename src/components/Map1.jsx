@@ -5,12 +5,14 @@ import { DynamicLeaves as DynamicLeaves3 } from "./DynamicLeaves3";
 import { SimonDevGrass21 } from "./SimonDevGrass21/SimonDevGrass21";
 import { SimonDevGrass22 } from "./SimonDevGrass22/SimonDevGrass22";
 import { SimonDevGrass23 } from "./SimonDevGrass23/SimonDevGrass23";
+import { GrassPatch } from "./GrassClaude";
 import { ImpostorForest } from "./ImpostorForest";
 import { LeafPileMountain } from "./LeafPileMountain";
 import { useDynamicLeaves3Controls } from "./useDynamicLeaves3Controls";
 import { useSimonDevGrass21Controls } from "./useSimonDevGrass21Controls";
 import { useSimonDevGrass22Controls } from "./useSimonDevGrass22Controls";
 import { useSimonDevGrass23Controls } from "./useSimonDevGrass23Controls";
+import { useGrassClaudeControls } from "./useGrassClaudeControls";
 import { useImpostorForestControls } from "./useImpostorForestControls";
 import { useLeafPileMountainControls } from "./useLeafPileMountainControls";
 import { useInstancedTreesControls } from "./useInstancedTreesControls";
@@ -57,6 +59,8 @@ export const Map1 = ({
   const { simonDevGrass22Enabled } = useSimonDevGrass22Controls();
   // Get SimonDevGrass23 controls (separate folder under FOLIAGE)
   const { simonDevGrass23Enabled } = useSimonDevGrass23Controls();
+  // Get GrassClaude controls
+  const { grassClaudeEnabled } = useGrassClaudeControls();
 
   // Get ImpostorForest controls
   const {
@@ -370,6 +374,11 @@ export const Map1 = ({
           getGroundHeight={getGroundHeight}
           characterPosition={characterPosition || fallbackPosition}
         />
+      )}
+
+      {/* GrassPatch - Claude grass system */}
+      {grassClaudeEnabled && (
+        <GrassPatch position={[0, 0, 0]} playerPosition={characterPosition} />
       )}
 
       {/* ImpostorForest - Octahedral impostor-based trees */}

@@ -512,7 +512,9 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
         float viewDotNormal = clamp(dot(normalize(grassFaceNormal.xz), normalize(viewDir.xz)), 0.0, 1.0);
         
         // Calculate thickening factor: high when edge-on (low dot), low when facing camera
-        float viewSpaceThickenFactor = pow(1.0 - viewDotNormal, u_viewThickenPower);
+        // ⭐ Quick_Grass style: Use easeOut instead of pow for smoother curve
+        // easeOut(1.0 - viewDotNormal, power) creates gradual falloff
+        float viewSpaceThickenFactor = easeOut(1.0 - viewDotNormal, u_viewThickenPower);
         
         // Thin out again when perfectly orthogonal to avoid visual artifacts
         viewSpaceThickenFactor *= smoothstep(0.0, 0.2, viewDotNormal);
@@ -566,6 +568,12 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
             float d = noise(i + vec2(1.0, 1.0));
             
             return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+          }
+          
+          // EaseOut function matching Quick_Grass: easeOut(x, t) = 1.0 - pow(1.0 - x, t)
+          // Creates gradual curve: starts fast, slows down
+          float easeOut(float x, float t) {
+            return 1.0 - pow(1.0 - x, t);
           }
           
           // Rotation matrices for wind movement
@@ -658,15 +666,17 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
           )}; // Total blade length
           
           // Calculate flexibility factor: base is stiff (0), tip is floppy (1)
-          float flexibilityFactor = vertexHeight / bladeLength;
-          flexibilityFactor = pow(flexibilityFactor, 1.5); // Curve the flexibility for more natural bend
+          // Like Quick_Grass: scale wind angle by height for flexible bending
+          float heightPercent = vertexHeight / bladeLength;
+          float flexibilityFactor = heightPercent; // Linear scaling like Quick_Grass for more flexibility
           
           // Apply rotation-based wind bending around the blade BASE
           // Use wind direction to determine rotation axis and amount
           
           // Convert wind direction to rotation components
-          float windRotationX = sin(windDirection) * windStrength * 0.5; // Forward-back rotation
-          float windRotationY = cos(windDirection) * windStrength * 0.8; // Side-to-side rotation
+          // ⭐ KEY FIX: Multiply by flexibilityFactor so base stays stiff, tip bends (like Quick_Grass)
+          float windRotationX = sin(windDirection) * windStrength * 0.5 * flexibilityFactor; // Forward-back rotation
+          float windRotationY = cos(windDirection) * windStrength * 0.8 * flexibilityFactor; // Side-to-side rotation
           
           // Create rotation matrices
           mat3 rotX = rotateX(windRotationX);
@@ -869,6 +879,11 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
           uniform float u_viewThickenPower;
           uniform float u_viewThickenStrength;
           
+          // EaseOut function matching Quick_Grass (for view thickening debug)
+          float easeOut(float x, float t) {
+            return 1.0 - pow(1.0 - x, t);
+          }
+          
           // Contact Shadow function - simulates ground shadows
           float getContactShadow(vec3 worldPos, vec3 lightDir) {
             float shadow = 1.0;
@@ -941,8 +956,8 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
             vec3 grassFaceNormal = normalize(vec3(1.0, 0.0, 0.0)); // Simplified for debug
             float viewDotNormal = clamp(dot(normalize(grassFaceNormal.xz), normalize(viewDir.xz)), 0.0, 1.0);
             
-            // Calculate thickening factor
-            float viewSpaceThickenFactor = pow(1.0 - viewDotNormal, u_viewThickenPower);
+            // Calculate thickening factor (use easeOut to match vertex shader)
+            float viewSpaceThickenFactor = easeOut(1.0 - viewDotNormal, u_viewThickenPower);
             viewSpaceThickenFactor *= smoothstep(0.0, 0.2, viewDotNormal);
             
             // Visualize as grayscale - brighter = more thickening

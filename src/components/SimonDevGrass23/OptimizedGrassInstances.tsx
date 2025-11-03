@@ -13,6 +13,8 @@ interface OptimizedGrassInstancesProps {
   lowLOD: THREE.BufferGeometry;
   grassMaterial: THREE.Material;
   grassScale: number;
+  grassHeight: number;
+  baseWidth: number;
   useFloat16: boolean;
   getGroundHeight: (x: number, z: number) => number;
   setMeshReady: (ready: boolean) => void;
@@ -29,6 +31,8 @@ export const useOptimizedGrassInstances = ({
   lowLOD,
   grassMaterial,
   grassScale,
+  grassHeight,
+  baseWidth,
   useFloat16,
   getGroundHeight,
   setMeshReady,
@@ -242,6 +246,8 @@ export const useOptimizedGrassInstances = ({
             grassMaterial,
             config.NUM_GRASS,
             grassScale,
+            grassHeight,
+            baseWidth,
             getGroundHeight
           );
           tileMesh.visible = true;
@@ -253,6 +259,8 @@ export const useOptimizedGrassInstances = ({
             grassMaterial,
             config.NUM_GRASS,
             grassScale,
+            grassHeight,
+            baseWidth,
             getGroundHeight,
             lodLevel
           );
@@ -342,6 +350,8 @@ export const useOptimizedGrassInstances = ({
           grassMaterial,
           config.NUM_GRASS,
           grassScale,
+          grassHeight,
+          baseWidth,
           getGroundHeight
         );
       } else if (oldMesh && oldLOD !== newLOD) {
@@ -372,6 +382,8 @@ export const useOptimizedGrassInstances = ({
             grassMaterial,
             config.NUM_GRASS,
             grassScale,
+            grassHeight,
+            baseWidth,
             getGroundHeight
           );
           // Ensure it's in the scene (it should be from when it was created)
@@ -386,6 +398,8 @@ export const useOptimizedGrassInstances = ({
             grassMaterial,
             config.NUM_GRASS,
             grassScale,
+            grassHeight,
+            baseWidth,
             getGroundHeight,
             newLOD as "HIGH" | "LOW"
           );
@@ -402,6 +416,8 @@ export const useOptimizedGrassInstances = ({
             grassMaterial,
             config.NUM_GRASS,
             grassScale,
+            grassHeight,
+            baseWidth,
             getGroundHeight
           );
           // Ensure it's in the scene (it should be from when it was created)
@@ -415,6 +431,8 @@ export const useOptimizedGrassInstances = ({
             grassMaterial,
             config.NUM_GRASS,
             grassScale,
+            grassHeight,
+            baseWidth,
             getGroundHeight,
             newLOD as "HIGH" | "LOW"
           );

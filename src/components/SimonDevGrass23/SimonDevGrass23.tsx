@@ -11,8 +11,8 @@ import { useSimonDevGrass23Controls } from "../useSimonDevGrass23Controls";
 export const SimonDevGrass23 = ({
   areaSize = 200,
   getGroundHeight,
-  grassHeight = 2.0,
-  grassScale = 2.0,
+  grassHeight = 1.5, // ⭐ Changed from 2.0 to 1.5 to match Quick_Grass height
+  grassScale = 1.0, // ⭐ Changed from 2.0 to 1.0 - Quick_Grass doesn't use separate scale, uses fixed sizes
   characterPosition,
   map = "map1(intro)",
   disableChunkRemoval = false,
@@ -191,6 +191,8 @@ export const SimonDevGrass23 = ({
     lowLOD,
     grassMaterial,
     grassScale: ctrlGrassScale ?? grassScale,
+    grassHeight: ctrlGrassHeight ?? grassHeight,
+    baseWidth,
     useFloat16: true,
     getGroundHeight,
     setMeshReady,

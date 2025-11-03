@@ -12,14 +12,14 @@ export const useSimonDevGrass23Controls = () => {
 
         // Geometry/scale
         grassHeight: {
-          value: 1.0,
+          value: 1.5, // ⭐ Changed from 1.0 to 1.5 to match Quick_Grass default
           min: 0.5,
           max: 5.0,
           step: 0.1,
           label: "📏 Grass Height",
         },
         grassScale: {
-          value: 1.0,
+          value: 1.0, // ⭐ Default 1.0 to match Quick_Grass (no separate scale)
           min: 0.5,
           max: 5.0,
           step: 0.1,
