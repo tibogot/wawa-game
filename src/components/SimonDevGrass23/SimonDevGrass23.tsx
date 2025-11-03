@@ -28,6 +28,10 @@ export const SimonDevGrass23 = ({
     // geometry
     grassHeight: ctrlGrassHeight,
     grassScale: ctrlGrassScale,
+    // blade geometry
+    baseWidth,
+    tipWidth,
+    curveOffset,
     // wind
     enableWindMovement,
     windStrength,
@@ -116,6 +120,9 @@ export const SimonDevGrass23 = ({
   } = useOptimizedGrassGeometry({
     grassHeight: ctrlGrassHeight ?? grassHeight,
     useFloat16: true,
+    baseWidth,
+    tipWidth,
+    curveOffset,
   });
 
   // Create grass material using the optimized material component

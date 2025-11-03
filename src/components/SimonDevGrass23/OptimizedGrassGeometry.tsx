@@ -14,17 +14,18 @@ const geometryCache = new Map<string, THREE.BufferGeometry>();
 const createGrassGeometry = (
   grassHeight: number,
   segments: number,
-  useFloat16: boolean = false
+  useFloat16: boolean = false,
+  baseWidth: number = 0.1,
+  tipWidth: number = 0.0,
+  curveOffset: number = 0.25
 ): THREE.BufferGeometry => {
-  const cacheKey = `${grassHeight}-${segments}-${useFloat16}`;
+  const cacheKey = `${grassHeight}-${segments}-${useFloat16}-${baseWidth}-${tipWidth}-${curveOffset}`;
 
   if (geometryCache.has(cacheKey)) {
     return geometryCache.get(cacheKey)!.clone();
   }
 
   const geometry = new THREE.BufferGeometry();
-  const baseWidth = 0.1;
-  const tipWidth = 0.0;
 
   // Create height distribution
   const segmentHeights = Array.from(
@@ -38,7 +39,7 @@ const createGrassGeometry = (
   );
 
   // Create curve offsets (backward lean) - parabolic curve
-  const curveOffsets = segmentHeights.map((t) => 0.25 * t * t);
+  const curveOffsets = segmentHeights.map((t) => curveOffset * t * t);
 
   const vertices: number[] = [];
   const uvs: number[] = [];
@@ -101,15 +102,21 @@ const createGrassGeometry = (
 export const useOptimizedGrassGeometry = ({
   grassHeight,
   useFloat16 = false,
+  baseWidth = 0.1,
+  tipWidth = 0.0,
+  curveOffset = 0.25,
 }: {
   grassHeight: number;
   useFloat16?: boolean;
+  baseWidth?: number;
+  tipWidth?: number;
+  curveOffset?: number;
 }) => {
   return useMemo(() => {
     // Create shared geometries - SimonDev's Ghost of Tsushima approach: 15 vertices for HIGH, 6 for LOW/ULTRA_LOW
-    const highLOD = createGrassGeometry(grassHeight, 4, useFloat16);
-    const lowLOD = createGrassGeometry(grassHeight, 1, useFloat16);
-    const ultraLowLOD = createGrassGeometry(grassHeight, 1, useFloat16);
+    const highLOD = createGrassGeometry(grassHeight, 4, useFloat16, baseWidth, tipWidth, curveOffset);
+    const lowLOD = createGrassGeometry(grassHeight, 1, useFloat16, baseWidth, tipWidth, curveOffset);
+    const ultraLowLOD = createGrassGeometry(grassHeight, 1, useFloat16, baseWidth, tipWidth, curveOffset);
 
     return {
       highLOD,
@@ -118,7 +125,7 @@ export const useOptimizedGrassGeometry = ({
       GRASS_LOD_DISTANCE,
       GRASS_ULTRA_LOW_DISTANCE,
     };
-  }, [grassHeight, useFloat16]);
+  }, [grassHeight, useFloat16, baseWidth, tipWidth, curveOffset]);
 };
 
 // Utility function to create optimized tile mesh with shared geometry

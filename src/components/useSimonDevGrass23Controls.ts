@@ -26,6 +26,34 @@ export const useSimonDevGrass23Controls = () => {
           label: "📐 Grass Scale",
         },
 
+        // Blade geometry
+        bladeGeometry: folder(
+          {
+            baseWidth: {
+              value: 0.1,
+              min: 0.0,
+              max: 0.5,
+              step: 0.01,
+              label: "📏 Base Width",
+            },
+            tipWidth: {
+              value: 0.0,
+              min: 0.0,
+              max: 0.3,
+              step: 0.01,
+              label: "📏 Tip Width",
+            },
+            curveOffset: {
+              value: 0.25,
+              min: 0.0,
+              max: 1.0,
+              step: 0.01,
+              label: "🌾 Backward Lean",
+            },
+          },
+          { collapsed: true }
+        ),
+
         // Wind
         wind: folder(
           {
@@ -92,7 +120,7 @@ export const useSimonDevGrass23Controls = () => {
         // Normal/lighting helpers
         normalsAO: folder(
           {
-            enableNormalMap: { value: false, label: "🟦 Enable Normal Map" },
+            enableNormalMap: { value: true, label: "🟦 Enable Normal Map" },
             enableAmbientOcclusion: {
               value: true,
               label: "🕳️ Ambient Occlusion",
@@ -126,7 +154,7 @@ export const useSimonDevGrass23Controls = () => {
         // Player interaction
         player: folder(
           {
-            enablePlayerInteraction: { value: false, label: "🧍 Interaction" },
+            enablePlayerInteraction: { value: true, label: "🧍 Interaction" },
             playerInteractionRadius: {
               value: 3.0,
               min: 0.5,

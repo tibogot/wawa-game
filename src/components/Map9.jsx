@@ -6,8 +6,10 @@ import { ProceduralTerrain7 } from "./ProceduralTerrain7";
 import { ProceduralTerrain8 } from "./ProceduralTerrain8";
 import { SimonDevGrass21 } from "./SimonDevGrass21/SimonDevGrass21";
 import { SimonDevGrass22 } from "./SimonDevGrass22/SimonDevGrass22";
+import { SimonDevGrass23 } from "./SimonDevGrass23/SimonDevGrass23";
 import { useSimonDevGrass21Controls } from "./useSimonDevGrass21Controls";
 import { useSimonDevGrass22Controls } from "./useSimonDevGrass22Controls";
+import { useSimonDevGrass23Controls } from "./useSimonDevGrass23Controls";
 import { HeightFog } from "./HeightFog";
 import { useHeightFogControls } from "./useHeightFogControls";
 import { CloudSystem } from "./CloudSystem";
@@ -63,6 +65,8 @@ export const Map9 = forwardRef(
     const { simonDevGrass21Enabled } = useSimonDevGrass21Controls();
     // Get SimonDevGrass22 controls
     const { simonDevGrass22Enabled } = useSimonDevGrass22Controls();
+    // Get SimonDevGrass23 controls
+    const { simonDevGrass23Enabled } = useSimonDevGrass23Controls();
 
     // Get Height Fog controls from hook
     const { heightFogEnabled, fogColor, fogHeight, fogNear, fogFar } =
@@ -344,6 +348,18 @@ export const Map9 = forwardRef(
         {/* SimonDevGrass22 Grass System - Only render when heightmap is ready */}
         {simonDevGrass22Enabled && heightmapLookup && (
           <SimonDevGrass22
+            areaSize={200}
+            mapSize={2500}
+            grassHeight={1.0}
+            grassScale={1.0}
+            getGroundHeight={getGroundHeight}
+            characterPosition={characterPosition || fallbackPosition}
+          />
+        )}
+
+        {/* SimonDevGrass23 Grass System - Only render when heightmap is ready */}
+        {simonDevGrass23Enabled && heightmapLookup && (
+          <SimonDevGrass23
             areaSize={200}
             mapSize={2500}
             grassHeight={1.0}
