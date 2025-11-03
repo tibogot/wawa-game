@@ -5,7 +5,7 @@ import { DynamicLeaves as DynamicLeaves3 } from "./DynamicLeaves3";
 import { SimonDevGrass21 } from "./SimonDevGrass21/SimonDevGrass21";
 import { SimonDevGrass22 } from "./SimonDevGrass22/SimonDevGrass22";
 import { SimonDevGrass23 } from "./SimonDevGrass23/SimonDevGrass23";
-import { GrassPatch } from "./GrassClaude";
+import { GrassPatch } from "./GrassClaude2";
 import { ImpostorForest } from "./ImpostorForest";
 import { LeafPileMountain } from "./LeafPileMountain";
 import { useDynamicLeaves3Controls } from "./useDynamicLeaves3Controls";
