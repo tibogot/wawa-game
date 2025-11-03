@@ -111,13 +111,7 @@ export const SimonDevGrass23 = ({
   }, []);
 
   // Create grass geometry using the optimized geometry component
-  const {
-    highLOD,
-    lowLOD,
-    ultraLowLOD,
-    GRASS_LOD_DISTANCE,
-    GRASS_ULTRA_LOW_DISTANCE,
-  } = useOptimizedGrassGeometry({
+  const { highLOD, lowLOD, GRASS_LOD_DISTANCE } = useOptimizedGrassGeometry({
     grassHeight: ctrlGrassHeight ?? grassHeight,
     useFloat16: true,
     baseWidth,
@@ -195,14 +189,12 @@ export const SimonDevGrass23 = ({
   const { instancedMeshRef } = useOptimizedGrassInstances({
     highLOD,
     lowLOD,
-    ultraLowLOD,
     grassMaterial,
     grassScale: ctrlGrassScale ?? grassScale,
     useFloat16: true,
     getGroundHeight,
     setMeshReady,
     GRASS_LOD_DISTANCE,
-    GRASS_ULTRA_LOW_DISTANCE,
     disableChunkRemoval,
     enableFrustumCulling,
     frustumCullingUpdateInterval,

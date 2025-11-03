@@ -28,6 +28,8 @@ import { Mountain } from "./Mountain";
 import { useMountainControls } from "./useMountainControls";
 import { QuarryRocks } from "./Quarry_rocks";
 import { useQuarryRocksControls } from "./useQuarryRocksControls";
+import { Rock1 } from "./Rock1";
+import { useRock1Controls } from "./useRock1Controls";
 import { WindFlag } from "./WindFlag";
 import { useWindFlagControls } from "./useWindFlagControls";
 import { DustParticles } from "./DustParticles";
@@ -170,6 +172,10 @@ export const Map9 = forwardRef(
       quarryRocksScale,
       quarryRocksRotation,
     } = useQuarryRocksControls();
+
+    // Get Rock1 controls
+    const { rock1Enabled, rock1Position, rock1Scale, rock1Rotation } =
+      useRock1Controls();
 
     // Get WindFlag controls
     const {
@@ -588,6 +594,16 @@ export const Map9 = forwardRef(
             position={quarryRocksPosition}
             scale={quarryRocksScale}
             rotation={quarryRocksRotation}
+            getTerrainHeight={getGroundHeight}
+          />
+        )}
+        {/* Rock1 */}
+        {heightmapLookup && (
+          <Rock1
+            enabled={rock1Enabled}
+            position={rock1Position}
+            scale={rock1Scale}
+            rotation={rock1Rotation}
             getTerrainHeight={getGroundHeight}
           />
         )}

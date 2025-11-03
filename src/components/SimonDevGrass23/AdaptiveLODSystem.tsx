@@ -3,11 +3,8 @@ import * as THREE from "three";
 
 interface LODConfig {
   GRASS_LOD_DISTANCE: number;
-  GRASS_ULTRA_LOW_DISTANCE: number;
   TILE_SIZE: number;
-  GRASS_PER_TILE_HIGH: number;
-  GRASS_PER_TILE_LOW: number;
-  GRASS_PER_TILE_ULTRA_LOW: number;
+  NUM_GRASS: number;
 }
 
 interface Tile {
@@ -29,33 +26,38 @@ export const useAdaptiveLODSystem = () => {
   const updateQueue = useRef<Tile[]>([]);
   const isUpdating = useRef(false);
 
+  // Optimized distance calculation (like Quick_Grass) - reusable AABB
+  const AABB_TMP = useRef(new THREE.Box3());
+  const cameraPosXZ = useRef(new THREE.Vector3());
+
   // Calculate update priority based on distance and LOD change impact
   const calculatePriority = useCallback(
     (tile: Tile, cameraPos: THREE.Vector3, config: LODConfig): number => {
-      const distance = Math.sqrt(
-        Math.pow(tile.centerX - cameraPos.x, 2) +
-          Math.pow(tile.centerZ - cameraPos.z, 2)
+      // Use optimized AABB distance calculation (like Quick_Grass)
+      AABB_TMP.current.setFromCenterAndSize(
+        new THREE.Vector3(tile.centerX, 0, tile.centerZ),
+        new THREE.Vector3(tile.tileSize, 1000, tile.tileSize)
       );
+      cameraPosXZ.current.set(cameraPos.x, 0, cameraPos.z);
+      const distance = AABB_TMP.current.distanceToPoint(cameraPosXZ.current);
 
       // Determine target LOD
       let targetLOD: string;
       if (distance < config.GRASS_LOD_DISTANCE) {
         targetLOD = "HIGH";
-      } else if (distance < config.GRASS_ULTRA_LOW_DISTANCE) {
-        targetLOD = "LOW";
       } else {
-        targetLOD = "ULTRA_LOW";
+        targetLOD = "LOW";
       }
 
       // Calculate priority based on:
       // 1. Distance to camera (closer = higher priority)
-      // 2. LOD change impact (HIGH->LOW = higher priority than LOW->ULTRA_LOW)
+      // 2. LOD change impact (HIGH->LOW transition)
       // 3. Time since last update
       const distancePriority = 1 / (distance + 1); // Closer = higher priority
 
       let lodChangePriority = 0;
       if (tile.currentLOD !== targetLOD) {
-        const lodLevels = { HIGH: 3, LOW: 2, ULTRA_LOW: 1 };
+        const lodLevels = { HIGH: 2, LOW: 1 };
         const currentLevel =
           lodLevels[tile.currentLOD as keyof typeof lodLevels] || 0;
         const targetLevel = lodLevels[targetLOD as keyof typeof lodLevels];
@@ -109,10 +111,13 @@ export const useAdaptiveLODSystem = () => {
           break; // Stop if we've used too much time this frame
         }
 
-        const distance = Math.sqrt(
-          Math.pow(tile.centerX - cameraPos.x, 2) +
-            Math.pow(tile.centerZ - cameraPos.z, 2)
+        // Use optimized AABB distance calculation (like Quick_Grass)
+        AABB_TMP.current.setFromCenterAndSize(
+          new THREE.Vector3(tile.centerX, 0, tile.centerZ),
+          new THREE.Vector3(tile.tileSize, 1000, tile.tileSize)
         );
+        cameraPosXZ.current.set(cameraPos.x, 0, cameraPos.z);
+        const distance = AABB_TMP.current.distanceToPoint(cameraPosXZ.current);
 
         // Hysteresis: use different thresholds for switching up vs down to prevent flickering
         let newLOD: string;
@@ -120,30 +125,10 @@ export const useAdaptiveLODSystem = () => {
 
         if (currentLOD === "HIGH") {
           // Switch down from HIGH to LOW at 50 (10 units farther than switching up)
-          newLOD =
-            distance < 50.0
-              ? "HIGH"
-              : distance < config.GRASS_ULTRA_LOW_DISTANCE + 10
-                ? "LOW"
-                : "ULTRA_LOW";
-        } else if (currentLOD === "LOW") {
-          // Switch up from LOW to HIGH at 35 (10 units closer than switching down)
-          // Switch down from LOW to ULTRA_LOW at config.GRASS_ULTRA_LOW_DISTANCE + 10
-          if (distance < 35.0) {
-            newLOD = "HIGH";
-          } else if (distance < config.GRASS_ULTRA_LOW_DISTANCE + 10) {
-            newLOD = "LOW";
-          } else {
-            newLOD = "ULTRA_LOW";
-          }
+          newLOD = distance < 50.0 ? "HIGH" : "LOW";
         } else {
-          // ULTRA_LOW: switch up to LOW at config.GRASS_ULTRA_LOW_DISTANCE
-          newLOD =
-            distance < config.GRASS_ULTRA_LOW_DISTANCE
-              ? distance < 35.0
-                ? "HIGH"
-                : "LOW"
-              : "ULTRA_LOW";
+          // Switch up from LOW to HIGH at 35 (10 units closer than switching down)
+          newLOD = distance < 35.0 ? "HIGH" : "LOW";
         }
 
         if (newLOD !== tile.currentLOD) {
@@ -188,10 +173,13 @@ export const useAdaptiveLODSystem = () => {
       cameraPos: THREE.Vector3,
       maxDistance: number = 150
     ): boolean => {
-      const distance = Math.sqrt(
-        Math.pow(tile.centerX - cameraPos.x, 2) +
-          Math.pow(tile.centerZ - cameraPos.z, 2)
+      // Use optimized AABB distance calculation (like Quick_Grass)
+      AABB_TMP.current.setFromCenterAndSize(
+        new THREE.Vector3(tile.centerX, 0, tile.centerZ),
+        new THREE.Vector3(tile.tileSize, 1000, tile.tileSize)
       );
+      cameraPosXZ.current.set(cameraPos.x, 0, cameraPos.z);
+      const distance = AABB_TMP.current.distanceToPoint(cameraPosXZ.current);
       return distance > maxDistance;
     },
     []

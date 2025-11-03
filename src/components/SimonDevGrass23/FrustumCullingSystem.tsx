@@ -33,6 +33,10 @@ export const useFrustumCullingSystem = ({
   const visibleTilesRef = useRef<Set<string>>(new Set());
   const culledTilesRef = useRef<Set<string>>(new Set());
 
+  // Optimized distance calculation (like Quick_Grass) - reusable AABB
+  const AABB_TMP = useRef(new THREE.Box3());
+  const cameraPosXZ = useRef(new THREE.Vector3());
+
   // Statistics
   const statsRef = useRef({
     totalTiles: 0,
@@ -117,11 +121,14 @@ export const useFrustumCullingSystem = ({
     ): boolean => {
       if (!enabled) return true;
 
-      // First check: Distance-based pre-culling
+      // First check: Distance-based pre-culling using optimized AABB method (like Quick_Grass)
       const cameraPos = camera.position;
-      const distance = Math.sqrt(
-        Math.pow(centerX - cameraPos.x, 2) + Math.pow(centerZ - cameraPos.z, 2)
+      AABB_TMP.current.setFromCenterAndSize(
+        new THREE.Vector3(centerX, 0, centerZ),
+        new THREE.Vector3(tileSize, 1000, tileSize)
       );
+      cameraPosXZ.current.set(cameraPos.x, 0, cameraPos.z);
+      const distance = AABB_TMP.current.distanceToPoint(cameraPosXZ.current);
 
       if (distance > maxCullingDistance) {
         return false; // Too far away

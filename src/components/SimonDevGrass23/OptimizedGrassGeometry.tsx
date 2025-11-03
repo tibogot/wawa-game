@@ -1,12 +1,17 @@
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 
+// Type declaration for Float16Array (if available)
+declare const Float16Array: {
+  new (array: number[] | ArrayLike<number>): ArrayLike<number> & {
+    [index: number]: number;
+  };
+};
+
 // LOD Constants
 const GRASS_VERTICES_HIGH = 15;
 const GRASS_VERTICES_LOW = 7;
-const GRASS_VERTICES_ULTRA_LOW = 4;
 const GRASS_LOD_DISTANCE = 40.0;
-const GRASS_ULTRA_LOW_DISTANCE = 60.0;
 
 // Shared geometry cache to avoid recreating geometries
 const geometryCache = new Map<string, THREE.BufferGeometry>();
@@ -65,7 +70,7 @@ const createGrassGeometry = (
 
   // Use appropriate precision
   const positionArray = useFloat16
-    ? new Float16Array(vertices)
+    ? (new (Float16Array as any)(vertices) as any)
     : new Float32Array(vertices);
   geometry.setAttribute(
     "position",
@@ -113,17 +118,28 @@ export const useOptimizedGrassGeometry = ({
   curveOffset?: number;
 }) => {
   return useMemo(() => {
-    // Create shared geometries - SimonDev's Ghost of Tsushima approach: 15 vertices for HIGH, 6 for LOW/ULTRA_LOW
-    const highLOD = createGrassGeometry(grassHeight, 4, useFloat16, baseWidth, tipWidth, curveOffset);
-    const lowLOD = createGrassGeometry(grassHeight, 1, useFloat16, baseWidth, tipWidth, curveOffset);
-    const ultraLowLOD = createGrassGeometry(grassHeight, 1, useFloat16, baseWidth, tipWidth, curveOffset);
+    // Create shared geometries - SimonDev's Ghost of Tsushima approach: 15 vertices for HIGH, 6 for LOW
+    const highLOD = createGrassGeometry(
+      grassHeight,
+      4,
+      useFloat16,
+      baseWidth,
+      tipWidth,
+      curveOffset
+    );
+    const lowLOD = createGrassGeometry(
+      grassHeight,
+      1,
+      useFloat16,
+      baseWidth,
+      tipWidth,
+      curveOffset
+    );
 
     return {
       highLOD,
       lowLOD,
-      ultraLowLOD,
       GRASS_LOD_DISTANCE,
-      GRASS_ULTRA_LOW_DISTANCE,
     };
   }, [grassHeight, useFloat16, baseWidth, tipWidth, curveOffset]);
 };
@@ -172,19 +188,80 @@ export const createOptimizedTileMesh = (
   tileMesh.instanceMatrix.set(matrixArray);
   tileMesh.instanceMatrix.needsUpdate = true;
 
-  // Set wind influence attribute (skip for ultra-low LOD)
-  if (lodLevel !== "ULTRA_LOW") {
-    const windInfluences = new Float32Array(grassCount);
-    for (let i = 0; i < grassCount; i++) {
-      windInfluences[i] = 0.5 + Math.random() * 1.0;
-    }
-    tileMesh.geometry.setAttribute(
-      "windInfluence",
-      new THREE.InstancedBufferAttribute(windInfluences, 1)
-    );
+  // Set wind influence attribute
+  const windInfluences = new Float32Array(grassCount);
+  for (let i = 0; i < grassCount; i++) {
+    windInfluences[i] = 0.5 + Math.random() * 1.0;
   }
+  tileMesh.geometry.setAttribute(
+    "windInfluence",
+    new THREE.InstancedBufferAttribute(windInfluences, 1)
+  );
 
   return tileMesh;
+};
+
+// Utility function to update an existing tile mesh (for pool reuse)
+export const updateOptimizedTileMesh = (
+  tileMesh: THREE.InstancedMesh,
+  tile: any,
+  geometry: THREE.BufferGeometry,
+  material: THREE.Material,
+  grassCount: number,
+  grassScale: number,
+  getGroundHeight: (x: number, z: number) => number
+): void => {
+  // Update geometry
+  tileMesh.geometry = geometry;
+
+  // Update material
+  tileMesh.material = material;
+
+  // Update position
+  tileMesh.position.set(tile.centerX, 0, tile.centerZ);
+
+  // Ensure instance count matches
+  if (tileMesh.count !== grassCount) {
+    tileMesh.count = grassCount;
+  }
+
+  // Update instance matrices
+  const dummy = new THREE.Object3D();
+  const matrixArray = new Float32Array(grassCount * 16);
+
+  for (let i = 0; i < grassCount; i++) {
+    const x = (Math.random() - 0.5) * tile.tileSize;
+    const z = (Math.random() - 0.5) * tile.tileSize;
+    const worldX = tile.centerX + x;
+    const worldZ = tile.centerZ + z;
+    const groundHeight = getGroundHeight ? getGroundHeight(worldX, worldZ) : 0;
+
+    dummy.rotation.y = Math.random() * Math.PI * 2;
+    const baseScale = grassScale * (0.5 + Math.random() * 0.5);
+    const heightVariation = 0.8 + Math.random() * 0.4;
+    const finalScale = baseScale * heightVariation;
+
+    dummy.position.set(x, groundHeight, z);
+    dummy.scale.set(baseScale, finalScale, baseScale);
+    dummy.updateMatrix();
+
+    // Store matrix in array for batch update
+    dummy.matrix.toArray(matrixArray, i * 16);
+  }
+
+  // Batch update all matrices at once
+  tileMesh.instanceMatrix.set(matrixArray);
+  tileMesh.instanceMatrix.needsUpdate = true;
+
+  // Update wind influence attribute
+  const windInfluences = new Float32Array(grassCount);
+  for (let i = 0; i < grassCount; i++) {
+    windInfluences[i] = 0.5 + Math.random() * 1.0;
+  }
+  tileMesh.geometry.setAttribute(
+    "windInfluence",
+    new THREE.InstancedBufferAttribute(windInfluences, 1)
+  );
 };
 
 // Cleanup function for geometry cache
@@ -193,10 +270,4 @@ export const cleanupGeometryCache = () => {
   geometryCache.clear();
 };
 
-export {
-  GRASS_VERTICES_HIGH,
-  GRASS_VERTICES_LOW,
-  GRASS_VERTICES_ULTRA_LOW,
-  GRASS_LOD_DISTANCE,
-  GRASS_ULTRA_LOW_DISTANCE,
-};
+export { GRASS_VERTICES_HIGH, GRASS_VERTICES_LOW, GRASS_LOD_DISTANCE };

@@ -2,20 +2,21 @@ import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { useAdaptiveLODSystem } from "./AdaptiveLODSystem";
-import { createOptimizedTileMesh } from "./OptimizedGrassGeometry";
+import {
+  createOptimizedTileMesh,
+  updateOptimizedTileMesh,
+} from "./OptimizedGrassGeometry";
 import { useFrustumCullingSystem } from "./FrustumCullingSystem";
 
 interface OptimizedGrassInstancesProps {
   highLOD: THREE.BufferGeometry;
   lowLOD: THREE.BufferGeometry;
-  ultraLowLOD: THREE.BufferGeometry;
   grassMaterial: THREE.Material;
   grassScale: number;
   useFloat16: boolean;
   getGroundHeight: (x: number, z: number) => number;
   setMeshReady: (ready: boolean) => void;
   GRASS_LOD_DISTANCE: number;
-  GRASS_ULTRA_LOW_DISTANCE: number;
   disableChunkRemoval?: boolean;
   enableFrustumCulling?: boolean;
   frustumCullingUpdateInterval?: number;
@@ -26,14 +27,12 @@ interface OptimizedGrassInstancesProps {
 export const useOptimizedGrassInstances = ({
   highLOD,
   lowLOD,
-  ultraLowLOD,
   grassMaterial,
   grassScale,
   useFloat16,
   getGroundHeight,
   setMeshReady,
   GRASS_LOD_DISTANCE,
-  GRASS_ULTRA_LOW_DISTANCE,
   disableChunkRemoval = false,
   enableFrustumCulling = true,
   frustumCullingUpdateInterval = 100,
@@ -46,6 +45,15 @@ export const useOptimizedGrassInstances = ({
   const lastUpdateTimeRef = useRef(0);
   const instancedMeshRef = useRef<THREE.Group | null>(null);
   const hasInitializedRef = useRef(false);
+
+  // Mesh pools for reuse (like Quick_Grass)
+  const meshPoolHigh = useRef<THREE.InstancedMesh[]>([]);
+  const meshPoolLow = useRef<THREE.InstancedMesh[]>([]);
+  const MAX_POOL_SIZE = 1000; // Prevent unbounded growth
+
+  // Optimized distance calculation (like Quick_Grass) - reusable AABB
+  const AABB_TMP = useRef(new THREE.Box3());
+  const cameraPosXZ = useRef(new THREE.Vector3());
 
   // Initialize optimization systems
   const adaptiveLOD = useAdaptiveLODSystem();
@@ -71,13 +79,12 @@ export const useOptimizedGrassInstances = ({
   }, [grassMaterial]);
 
   // Configuration
+  // Fixed instance count per mesh (like Quick_Grass: (32 * 32) * 3 = 3072)
+  const NUM_GRASS = 3072;
   const config = {
     GRASS_LOD_DISTANCE,
-    GRASS_ULTRA_LOW_DISTANCE,
     TILE_SIZE: 10,
-    GRASS_PER_TILE_HIGH: 4000,
-    GRASS_PER_TILE_LOW: 1500,
-    GRASS_PER_TILE_ULTRA_LOW: 1500,
+    NUM_GRASS,
   };
 
   // Initialize grass on first frame when camera is ready
@@ -171,11 +178,13 @@ export const useOptimizedGrassInstances = ({
       tiles.forEach((tile, index) => {
         const tileId = `tile_${index}`;
 
-        // Calculate distance from camera
-        const distance = Math.sqrt(
-          Math.pow(tile.centerX - initialCameraPos.x, 2) +
-            Math.pow(tile.centerZ - initialCameraPos.z, 2)
+        // Calculate distance from camera using optimized AABB method (like Quick_Grass)
+        AABB_TMP.current.setFromCenterAndSize(
+          new THREE.Vector3(tile.centerX, 0, tile.centerZ),
+          new THREE.Vector3(config.TILE_SIZE, 1000, config.TILE_SIZE)
         );
+        cameraPosXZ.current.set(initialCameraPos.x, 0, initialCameraPos.z);
+        const distance = AABB_TMP.current.distanceToPoint(cameraPosXZ.current);
         tile.distanceToCamera = distance;
 
         // Check distance
@@ -206,39 +215,53 @@ export const useOptimizedGrassInstances = ({
         visibleTiles++;
 
         // Determine initial LOD
-        let lodLevel: "HIGH" | "LOW" | "ULTRA_LOW";
+        let lodLevel: "HIGH" | "LOW";
         let geometry: THREE.BufferGeometry;
-        let grassCount: number;
 
         if (distance < config.GRASS_LOD_DISTANCE) {
           lodLevel = "HIGH";
           geometry = highLOD;
-          grassCount = config.GRASS_PER_TILE_HIGH;
-        } else if (distance < config.GRASS_ULTRA_LOW_DISTANCE) {
+        } else {
           lodLevel = "LOW";
           geometry = lowLOD;
-          grassCount = config.GRASS_PER_TILE_LOW;
-        } else {
-          lodLevel = "ULTRA_LOW";
-          geometry = ultraLowLOD;
-          grassCount = config.GRASS_PER_TILE_ULTRA_LOW;
         }
 
         tile.currentLOD = lodLevel;
 
-        // Create mesh directly (no pooling)
-        const tileMesh = createOptimizedTileMesh(
-          tile,
-          geometry,
-          grassMaterial,
-          grassCount,
-          grassScale,
-          getGroundHeight,
-          lodLevel
-        );
+        // Try to reuse mesh from pool (like Quick_Grass)
+        const selectedPool = lodLevel === "HIGH" ? meshPoolHigh : meshPoolLow;
+        let tileMesh: THREE.InstancedMesh | null = null;
+
+        if (selectedPool.current.length > 0) {
+          // Reuse mesh from pool
+          tileMesh = selectedPool.current.pop()!;
+          updateOptimizedTileMesh(
+            tileMesh,
+            tile,
+            geometry,
+            grassMaterial,
+            config.NUM_GRASS,
+            grassScale,
+            getGroundHeight
+          );
+          tileMesh.visible = true;
+        } else {
+          // Create new mesh if pool is empty
+          tileMesh = createOptimizedTileMesh(
+            tile,
+            geometry,
+            grassMaterial,
+            config.NUM_GRASS,
+            grassScale,
+            getGroundHeight,
+            lodLevel
+          );
+        }
 
         if (tileMesh) {
           tile.mesh = tileMesh;
+          // Explicitly set visible for initial creation (before update frame hides everything)
+          tileMesh.visible = true;
           instancedMesh.add(tileMesh);
         }
       });
@@ -274,48 +297,144 @@ export const useOptimizedGrassInstances = ({
     }
     lastUpdateTimeRef.current = now;
 
-    // Process LOD updates in batches
-    const updateTile = (tile: any, newLOD: string) => {
-      // Remove old mesh
-      if (tile.mesh) {
-        instancedMeshRef.current!.remove(tile.mesh);
-        tile.mesh.dispose();
-      }
+    // Simplified visibility management: Set all meshes invisible first (like Quick_Grass)
+    // Only do this after initial creation is complete to avoid hiding newly created meshes
+    if (hasInitializedRef.current) {
+      instancedMeshRef.current.traverse((obj) => {
+        const mesh = obj as THREE.InstancedMesh;
+        if ((mesh as any).isInstancedMesh) {
+          mesh.visible = false;
+        }
+      });
+    }
 
-      // Determine geometry and grass count for new LOD
+    // Process LOD updates in batches
+    const updateTile = (
+      tile: any,
+      newLOD: string,
+      shouldBeVisible: boolean = true
+    ) => {
+      const oldMesh = tile.mesh;
+      const oldLOD = tile.currentLOD;
+
+      // Determine geometry for new LOD (fixed instance count for all LODs)
       let geometry: THREE.BufferGeometry;
-      let grassCount: number;
+      let targetPool: React.MutableRefObject<THREE.InstancedMesh[]>;
 
       if (newLOD === "HIGH") {
         geometry = highLOD;
-        grassCount = config.GRASS_PER_TILE_HIGH;
-      } else if (newLOD === "LOW") {
-        geometry = lowLOD;
-        grassCount = config.GRASS_PER_TILE_LOW;
+        targetPool = meshPoolHigh;
       } else {
-        geometry = ultraLowLOD;
-        grassCount = config.GRASS_PER_TILE_ULTRA_LOW;
+        geometry = lowLOD;
+        targetPool = meshPoolLow;
       }
 
-      // Create new mesh directly
-      const newMesh = createOptimizedTileMesh(
-        tile,
-        geometry,
-        grassMaterial,
-        grassCount,
-        grassScale,
-        getGroundHeight,
-        newLOD as "HIGH" | "LOW" | "ULTRA_LOW"
-      );
+      // Simplified visibility management: Keep meshes in scene, just update them
+      let newMesh: THREE.InstancedMesh;
 
-      if (newMesh) {
-        tile.mesh = newMesh;
-        tile.currentLOD = newLOD;
-        instancedMeshRef.current!.add(newMesh);
+      if (oldMesh && oldLOD === newLOD) {
+        // Same LOD, just update the existing mesh (keep in scene)
+        newMesh = oldMesh;
+        updateOptimizedTileMesh(
+          newMesh,
+          tile,
+          geometry,
+          grassMaterial,
+          config.NUM_GRASS,
+          grassScale,
+          getGroundHeight
+        );
+      } else if (oldMesh && oldLOD !== newLOD) {
+        // LOD changed: Return old mesh to pool and get new one
+        // Keep mesh in scene, just set invisible (simplified visibility management)
+        oldMesh.visible = false;
+
+        // Return to pool based on old LOD
+        const oldPool = oldLOD === "HIGH" ? meshPoolHigh : meshPoolLow;
+        if (oldPool.current.length < MAX_POOL_SIZE) {
+          oldPool.current.push(oldMesh);
+        } else {
+          // Dispose if pool is full (but this should rarely happen)
+          oldMesh.visible = false;
+          if (instancedMeshRef.current!.children.includes(oldMesh)) {
+            instancedMeshRef.current!.remove(oldMesh);
+          }
+          oldMesh.dispose();
+        }
+
+        // Get mesh from target pool or create new
+        if (targetPool.current.length > 0) {
+          newMesh = targetPool.current.pop()!;
+          updateOptimizedTileMesh(
+            newMesh,
+            tile,
+            geometry,
+            grassMaterial,
+            config.NUM_GRASS,
+            grassScale,
+            getGroundHeight
+          );
+          // Ensure it's in the scene (it should be from when it was created)
+          if (!instancedMeshRef.current!.children.includes(newMesh)) {
+            instancedMeshRef.current!.add(newMesh);
+          }
+        } else {
+          // Create new mesh if pool is empty
+          newMesh = createOptimizedTileMesh(
+            tile,
+            geometry,
+            grassMaterial,
+            config.NUM_GRASS,
+            grassScale,
+            getGroundHeight,
+            newLOD as "HIGH" | "LOW"
+          );
+          instancedMeshRef.current!.add(newMesh);
+        }
+      } else if (!oldMesh) {
+        // No existing mesh: create new one
+        if (targetPool.current.length > 0) {
+          newMesh = targetPool.current.pop()!;
+          updateOptimizedTileMesh(
+            newMesh,
+            tile,
+            geometry,
+            grassMaterial,
+            config.NUM_GRASS,
+            grassScale,
+            getGroundHeight
+          );
+          // Ensure it's in the scene (it should be from when it was created)
+          if (!instancedMeshRef.current!.children.includes(newMesh)) {
+            instancedMeshRef.current!.add(newMesh);
+          }
+        } else {
+          newMesh = createOptimizedTileMesh(
+            tile,
+            geometry,
+            grassMaterial,
+            config.NUM_GRASS,
+            grassScale,
+            getGroundHeight,
+            newLOD as "HIGH" | "LOW"
+          );
+          instancedMeshRef.current!.add(newMesh);
+        }
+      }
+
+      tile.mesh = newMesh!;
+      tile.currentLOD = newLOD;
+
+      // Set visibility based on whether tile should be visible
+      if (shouldBeVisible) {
+        newMesh!.visible = true;
       }
     };
 
     // Apply frustum culling to tiles before LOD updates
+    const INITIAL_CREATION_DISTANCE = 150; // Same as initial creation
+    const CLOSE_DISTANCE = 60; // Same as initial creation
+
     if (enableFrustumCulling) {
       const tilesWithIds = tilesRef.current.map((tile, index) => ({
         ...tile,
@@ -325,25 +444,73 @@ export const useOptimizedGrassInstances = ({
       const { visible: visibleTileIds } =
         frustumCulling.cullTiles(tilesWithIds);
 
-      // Filter tiles to only process visible ones
-      const visibleTiles = tilesRef.current.filter((tile, index) =>
-        visibleTileIds.includes(`tile_${index}`)
-      );
+      // Filter tiles by both frustum and distance (matching initial creation logic)
+      cameraPosXZ.current.set(cameraPos.x, 0, cameraPos.z);
+      const visibleTiles = tilesRef.current.filter((tile, index) => {
+        const tileId = `tile_${index}`;
+        // Use optimized AABB distance calculation (like Quick_Grass)
+        AABB_TMP.current.setFromCenterAndSize(
+          new THREE.Vector3(tile.centerX, 0, tile.centerZ),
+          new THREE.Vector3(config.TILE_SIZE, 1000, config.TILE_SIZE)
+        );
+        const distance = AABB_TMP.current.distanceToPoint(cameraPosXZ.current);
+        const isWithinDistance = distance <= INITIAL_CREATION_DISTANCE;
+        const isCloseToCharacter = distance <= CLOSE_DISTANCE;
 
-      // Process LOD updates only for visible tiles
+        // Same logic as initial creation: within distance AND (close OR in frustum)
+        const isFrustumVisible =
+          isCloseToCharacter || visibleTileIds.includes(tileId);
+
+        return isWithinDistance && isFrustumVisible;
+      });
+
+      // Make visible all tiles that should be visible (including ones that don't need LOD updates)
+      visibleTiles.forEach((tile) => {
+        if (tile.mesh) {
+          tile.mesh.visible = true;
+        }
+      });
+
+      // Process LOD updates only for visible tiles (they should be visible)
       adaptiveLOD.processLODUpdates(
         visibleTiles,
         cameraPos,
         config,
-        updateTile
+        (tile: any, newLOD: string) => updateTile(tile, newLOD, true)
       );
     } else {
-      // Process LOD updates for all tiles if frustum culling is disabled
+      // If frustum culling disabled, use distance-based visibility
+      cameraPosXZ.current.set(cameraPos.x, 0, cameraPos.z);
+      tilesRef.current.forEach((tile) => {
+        if (tile.mesh) {
+          // Use optimized AABB distance calculation (like Quick_Grass)
+          AABB_TMP.current.setFromCenterAndSize(
+            new THREE.Vector3(tile.centerX, 0, tile.centerZ),
+            new THREE.Vector3(config.TILE_SIZE, 1000, config.TILE_SIZE)
+          );
+          const distance = AABB_TMP.current.distanceToPoint(
+            cameraPosXZ.current
+          );
+          tile.mesh.visible = distance <= INITIAL_CREATION_DISTANCE;
+        }
+      });
+
+      // Process LOD updates for all tiles within distance
+      const tilesWithinDistance = tilesRef.current.filter((tile) => {
+        // Use optimized AABB distance calculation (like Quick_Grass)
+        AABB_TMP.current.setFromCenterAndSize(
+          new THREE.Vector3(tile.centerX, 0, tile.centerZ),
+          new THREE.Vector3(config.TILE_SIZE, 1000, config.TILE_SIZE)
+        );
+        const distance = AABB_TMP.current.distanceToPoint(cameraPosXZ.current);
+        return distance <= INITIAL_CREATION_DISTANCE;
+      });
+
       adaptiveLOD.processLODUpdates(
-        tilesRef.current,
+        tilesWithinDistance,
         cameraPos,
         config,
-        updateTile
+        (tile: any, newLOD: string) => updateTile(tile, newLOD, true)
       );
     }
   });
