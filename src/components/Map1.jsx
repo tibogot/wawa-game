@@ -5,7 +5,8 @@ import { DynamicLeaves as DynamicLeaves3 } from "./DynamicLeaves3";
 import { SimonDevGrass21 } from "./SimonDevGrass21/SimonDevGrass21";
 import { SimonDevGrass22 } from "./SimonDevGrass22/SimonDevGrass22";
 import { SimonDevGrass23 } from "./SimonDevGrass23/SimonDevGrass23";
-import { GrassPatch } from "./GrassClaude2";
+import { GrassField } from "./GrassClaude2";
+import { GrassField as GrassField3 } from "./GrassClaude3";
 import { ImpostorForest } from "./ImpostorForest";
 import { LeafPileMountain } from "./LeafPileMountain";
 import { useDynamicLeaves3Controls } from "./useDynamicLeaves3Controls";
@@ -13,6 +14,7 @@ import { useSimonDevGrass21Controls } from "./useSimonDevGrass21Controls";
 import { useSimonDevGrass22Controls } from "./useSimonDevGrass22Controls";
 import { useSimonDevGrass23Controls } from "./useSimonDevGrass23Controls";
 import { useGrassClaudeControls } from "./useGrassClaudeControls";
+import { useGrassClaude3Controls } from "./useGrassClaude3Controls";
 import { useImpostorForestControls } from "./useImpostorForestControls";
 import { useLeafPileMountainControls } from "./useLeafPileMountainControls";
 import { useInstancedTreesControls } from "./useInstancedTreesControls";
@@ -61,6 +63,9 @@ export const Map1 = ({
   const { simonDevGrass23Enabled } = useSimonDevGrass23Controls();
   // Get GrassClaude controls
   const { grassClaudeEnabled } = useGrassClaudeControls();
+  // Get GrassClaude3 controls
+  // Leva flattens all folders, so controls are at top level
+  const { grassClaude3Enabled } = useGrassClaude3Controls();
 
   // Get ImpostorForest controls
   const {
@@ -376,9 +381,38 @@ export const Map1 = ({
         />
       )}
 
-      {/* GrassPatch - Claude grass system */}
+      {/* GrassField - Claude grass system with multiple patches */}
       {grassClaudeEnabled && (
-        <GrassPatch position={[0, 0, 0]} playerPosition={characterPosition} />
+        <GrassField
+          gridSize={9}
+          patchSpacing={10}
+          centerPosition={[0, 0, 0]}
+          playerPosition={characterPosition}
+          segments={6}
+          numGrass={32 * 32 * 3}
+          patchSize={10}
+          grassWidth={0.1}
+          grassHeight={1.5}
+          lodDistance={15}
+          maxDistance={100}
+        />
+      )}
+
+      {/* GrassField3 - Claude grass system v3 with advanced controls */}
+      {grassClaude3Enabled && (
+        <GrassField3
+          gridSize={9}
+          patchSpacing={10}
+          centerPosition={[0, 0, 0]}
+          playerPosition={characterPosition}
+          segments={6}
+          numGrass={32 * 32 * 3}
+          patchSize={10}
+          grassWidth={0.1}
+          grassHeight={1.5}
+          lodDistance={15}
+          maxDistance={100}
+        />
       )}
 
       {/* ImpostorForest - Octahedral impostor-based trees */}
