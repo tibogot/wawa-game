@@ -262,6 +262,11 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
         if ((shader.uniforms as any).u_aoDebugMode)
           (shader.uniforms as any).u_aoDebugMode.value = config.aoDebugMode;
 
+        // Normal Map uniform (runtime update)
+        if ((shader.uniforms as any).u_enableNormalMap)
+          (shader.uniforms as any).u_enableNormalMap.value =
+            config.enableNormalMap;
+
         // Gradient uniforms
         if ((shader.uniforms as any).u_enableDebugShader)
           (shader.uniforms as any).u_enableDebugShader.value =
@@ -316,8 +321,9 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
 
     const newMaterial = new THREE.MeshStandardMaterial({
       color: "#4a9d3f",
-      side: THREE.DoubleSide,
-      normalMap: config.enableNormalMap ? config.normalMapTexture : null,
+      side: THREE.FrontSide,
+      // No longer using normal map texture - using procedural technique instead
+      // normalMap: config.enableNormalMap ? config.normalMapTexture : null,
     });
 
     // Optimized shader compilation with reduced variants
@@ -463,11 +469,15 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
         value: config.gradientShaping,
       };
 
+      // Normal Map uniform (for procedural technique)
+      shader.uniforms.u_enableNormalMap = {
+        value: config.enableNormalMap,
+      };
+
       // Store shader reference
       newMaterial.userData.shader = shader;
 
       // Use the exact same shader structure as v20 (which works perfectly)
-      // Add billboarding to make grass blades face the camera
       shader.vertexShader = shader.vertexShader.replace(
         "#include <beginnormal_vertex>",
         `
@@ -755,26 +765,51 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
         combinedBeginVertexCode
       );
 
-      // Inject normal map fragment shader - blue gradient normals (exact copy from v20)
-      if (config.enableNormalMap) {
-        // Add normal map sampling in fragment shader
-        shader.fragmentShader = shader.fragmentShader.replace(
-          "#include <normal_fragment>",
-          `
-          #include <normal_fragment>
+      // Inject procedural normal blending fragment shader (procedural technique instead of normal map)
+      // ALWAYS inject the code, but gate it with runtime uniform so it works when toggling
+      // Replace normal_fragment chunk to inject our procedural normal blending
+      // We need to run AFTER the normal is set up by the include
+      // Replace normal_fragment_begin to modify normal BEFORE geometryNormal is calculated
+      // Three.js calculates geometryNormal FROM normal, so we need to modify normal first
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <normal_fragment_begin>",
+        `
+        #include <normal_fragment_begin>
+        
+        // Procedural rounded cross-section: modify normal BEFORE geometryNormal is calculated
+        if (u_enableNormalMap) {
+          // Calculate blended normal BEFORE normal_fragment processes it
+          float normalMixFactor = vWidthPercent; // 0.0 = left edge (UV.x=0), 1.0 = right edge (UV.x=1)
           
-          // Sample normal map for rounded normals (Ghost of Tsushima technique)
-          vec4 normalMapColor = texture2D(normalMap, vUv);
+          // Blend between the two rotated normals based on position across blade width
+          vec3 blendedNormal = mix(vRotatedNormal1, vRotatedNormal2, normalMixFactor);
           
-          // Extract normal from RGB channels - Ghost of Tsushima gradient normal map
-          // The normal map encodes rounded cross-section gradient for blade thickness
-          vec3 tangentNormal = normalMapColor.rgb * 2.0 - 1.0; // Convert from 0-1 to -1 to 1
-          
-          // Apply to base normal - creates rounded cross-section effect
-          normal = normalize(normal + tangentNormal * 0.5);
-          `
-        );
-      }
+          // CRITICAL: Modify normal BEFORE geometryNormal is calculated
+          // This ensures geometryNormal is calculated FROM our modified normal
+          normal = normalize(blendedNormal);
+        }
+        `
+      );
+
+      // Also modify geometryNormal AFTER normal_fragment processes it to be safe
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <normal_fragment>",
+        `
+        #include <normal_fragment>
+        
+          // Ensure geometryNormal uses our modified normal if it exists
+          if (u_enableNormalMap) {
+            // Recalculate geometryNormal from our blended normal
+            float normalMixFactor = vWidthPercent;
+            vec3 blendedNormal = normalize(mix(vRotatedNormal1, vRotatedNormal2, normalMixFactor));
+            
+          // Update geometryNormal if it exists - Three.js uses this for lighting
+          #ifdef USE_GEOMETRY_NORMAL
+          geometryNormal = blendedNormal;
+          #endif
+          }
+        `
+      );
 
       // Always add color effects section (all features runtime-gated via uniforms)
       // Add uniform for resolution and all color/lighting uniforms
@@ -825,6 +860,9 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
           uniform vec3 u_tipColor;
           uniform float u_gradientShaping;
           uniform bool u_enableDebugShader;
+          
+          // Normal Map uniforms (for procedural technique)
+          uniform bool u_enableNormalMap;
           
           // View Thickening uniforms
           uniform bool u_enableViewThickenDebug;
@@ -932,6 +970,9 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
           varying float vThickness;
           varying vec3 vReflect;
           varying vec3 vViewDir;
+          varying vec3 vRotatedNormal1;
+          varying vec3 vRotatedNormal2;
+          varying float vWidthPercent;
           `
       );
 
@@ -950,6 +991,9 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
         varying float vThickness;
         varying vec3 vReflect;
         varying vec3 vViewDir;
+        varying vec3 vRotatedNormal1;
+        varying vec3 vRotatedNormal2;
+        varying float vWidthPercent;
           `
       );
 
@@ -974,7 +1018,64 @@ export const useOptimizedGrassMaterial = (config: MaterialConfig) => {
           vViewDir = normalize(cameraPosition - worldPosCalc);
           vec3 worldNormal = normalize(mat3(modelMatrix) * normal);
           vReflect = reflect(-vViewDir, worldNormal);
+          
+          // Procedural rounded cross-section: rotate normals for curvature blending
+          // Rotate in object space FIRST (before transformations), then transform separately
+          // This matches the screenshot technique exactly
+          
+          // Rotate normal in two opposite directions around Y-axis in object space
+          // Rotation around Y-axis by +0.3 * PI (~54 degrees) - original screenshot value
+          float rotAngle1 = 0.3 * 3.14159; // Original 0.3 (~54 degrees)
+          float s1 = sin(rotAngle1);
+          float c1 = cos(rotAngle1);
+          mat3 rotY1 = mat3(
+            c1, 0.0, s1,
+            0.0, 1.0, 0.0,
+            -s1, 0.0, c1
+          );
+          vec3 rotatedNormal1Obj = rotY1 * objectNormal;
+          
+          // Rotation around Y-axis by -0.3 * PI (~-54 degrees) - original screenshot value
+          float rotAngle2 = -0.3 * 3.14159; // Original -0.3 (~-54 degrees)
+          float s2 = sin(rotAngle2);
+          float c2 = cos(rotAngle2);
+          mat3 rotY2 = mat3(
+            c2, 0.0, s2,
+            0.0, 1.0, 0.0,
+            -s2, 0.0, c2
+          );
+          vec3 rotatedNormal2Obj = rotY2 * objectNormal;
+          
+          // Transform both rotated normals to view space separately
+          vRotatedNormal1 = normalize(normalMatrix * rotatedNormal1Obj);
+          vRotatedNormal2 = normalize(normalMatrix * rotatedNormal2Obj);
+          
+          // Calculate width percent: 0.0 at left edge (uv.x = 0), 1.0 at right edge (uv.x = 1)
+          vWidthPercent = uv.x;
           `
+      );
+
+      // CRITICAL: Modify normal RIGHT BEFORE lighting calculations
+      // This ensures lighting uses our modified normal
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <lights_fragment_begin>",
+        `
+        #include <lights_fragment_begin>
+        
+        // Modify normal RIGHT BEFORE lighting uses it
+        if (u_enableNormalMap) {
+          float normalMixFactor = vWidthPercent;
+          vec3 blendedNormal = normalize(mix(vRotatedNormal1, vRotatedNormal2, normalMixFactor));
+          
+          // Update normal - lighting will use this
+          normal = blendedNormal;
+          
+          // Also update geometryNormal if it exists (used for post-lighting calculations like SSS)
+          #ifdef USE_GEOMETRY_NORMAL
+          geometryNormal = blendedNormal;
+          #endif
+        }
+        `
       );
 
       // Inject moonlight and SSS after standard lighting where geometryNormal/viewDir exist

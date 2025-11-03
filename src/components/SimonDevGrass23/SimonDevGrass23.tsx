@@ -213,6 +213,7 @@ export const SimonDevGrass23 = ({
     windNoiseScale: windNoiseScale,
     windNoiseSpeed: windNoiseSpeed,
     windNoiseAmplitude: windNoiseAmplitude,
+    enableNormalMap: enableNormalMap,
   });
 
   return meshReady && instancedMeshRef.current ? (

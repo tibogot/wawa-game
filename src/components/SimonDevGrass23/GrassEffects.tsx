@@ -11,6 +11,7 @@ export const useGrassEffects = ({
   windNoiseScale,
   windNoiseSpeed,
   windNoiseAmplitude,
+  enableNormalMap,
 }) => {
   // Get global wind context
   const { windUniforms } = useGlobalWind();
@@ -51,9 +52,11 @@ export const useGrassEffects = ({
   }, [instancedMeshRef]);
 
   // Update time uniform for animation (debug vertex and wind movement)
+  // Also update enableNormalMap uniform which can be toggled independently
   useEffect(() => {
-    if (!enableDebugVertex && !enableWindMovement && !enablePlayerInteraction)
-      return;
+    // Always run the update loop - enableNormalMap needs to update even if other features are off
+    // if (!enableDebugVertex && !enableWindMovement && !enablePlayerInteraction && enableNormalMap === undefined)
+    //   return;
 
     let animationId;
     const updateTime = () => {
@@ -107,6 +110,11 @@ export const useGrassEffects = ({
                   windUniforms.u_windNoiseAmplitude.value;
               }
             }
+            
+            // Update normal map uniform (runtime toggle) - ALWAYS update if uniform exists
+            if (material.userData.shader && material.userData.shader.uniforms && material.userData.shader.uniforms.u_enableNormalMap !== undefined) {
+              material.userData.shader.uniforms.u_enableNormalMap.value = enableNormalMap ?? false;
+            }
           }
         });
       }
@@ -127,6 +135,7 @@ export const useGrassEffects = ({
     enablePlayerInteraction,
     characterPosition,
     windUniforms,
+    enableNormalMap,
   ]);
 };
 
