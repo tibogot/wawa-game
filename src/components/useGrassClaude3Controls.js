@@ -32,11 +32,11 @@ export function useGrassClaude3Controls() {
               label: "Fog End",
             },
             fogColor: {
-              value: "#6493e2",
+              value: "#4f74af",
               label: "Fog Color",
             },
             fogIntensity: {
-              value: 0.8,
+              value: 1.0,
               min: 0,
               max: 2,
               step: 0.1,
@@ -61,7 +61,7 @@ export function useGrassClaude3Controls() {
               label: "Backscatter Intensity",
             },
             backscatterColor: {
-              value: "#ccffb3",
+              value: "#516647",
               label: "Backscatter Color",
             },
             backscatterPower: {
@@ -170,36 +170,6 @@ export function useGrassClaude3Controls() {
               max: 1.0,
               step: 0.01,
               label: "Grass Middle Strength",
-            },
-          },
-          { collapsed: true }
-        ),
-
-        // Grass Color Controls
-        colors: folder(
-          {
-            baseColor1: {
-              value: "#051a05",
-              label: "Base Color 1",
-            },
-            baseColor2: {
-              value: "#0a1a0a",
-              label: "Base Color 2",
-            },
-            tipColor1: {
-              value: "#a6cc40",
-              label: "Tip Color 1",
-            },
-            tipColor2: {
-              value: "#ccb366",
-              label: "Tip Color 2",
-            },
-            colorVariationStrength: {
-              value: 1.0,
-              min: 0,
-              max: 1,
-              step: 0.01,
-              label: "Color Variation",
             },
           },
           { collapsed: true }

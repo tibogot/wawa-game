@@ -6,7 +6,6 @@
 import React, { useRef, useMemo, useEffect } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { useGrassClaude3Controls } from "./useGrassClaude3Controls";
 
 // ============================================================================
 // SHADER UTILITIES - Concatenated from your global shader files
@@ -249,6 +248,12 @@ uniform vec4 heightParams;
 uniform vec3 playerPos;
 uniform mat4 viewMatrixInverse;
 
+// Grass color uniforms
+uniform vec3 uBaseColor1;
+uniform vec3 uBaseColor2;
+uniform vec3 uTipColor1;
+uniform vec3 uTipColor2;
+
 attribute float vertIndex;
 
 // Utility functions
@@ -428,11 +433,11 @@ void main() {
   grassVertexPosition = grassMat * grassVertexPosition;
   grassVertexPosition += grassOffset;
 
-  // Color variation
-  vec3 b1 = vec3(0.02, 0.075, 0.01);
-  vec3 b2 = vec3(0.025, 0.1, 0.01);
-  vec3 t1 = vec3(0.65, 0.8, 0.25);
-  vec3 t2 = vec3(0.8, 0.9, 0.4);
+  // Color variation - use uniforms
+  vec3 b1 = uBaseColor1;
+  vec3 b2 = uBaseColor2;
+  vec3 t1 = uTipColor1;
+  vec3 t2 = uTipColor2;
 
   vec3 baseColour = mix(b1, b2, hashGrassColour.x);
   vec3 tipColour = mix(t1, t2, hashGrassColour.y);
@@ -512,34 +517,6 @@ uniform vec3 specular;
 uniform float shininess;
 uniform float opacity;
 
-// Custom uniforms for advanced features
-uniform bool uFogEnabled;
-uniform float uFogNear;
-uniform float uFogFar;
-uniform vec3 uFogColor;
-uniform float uFogIntensity;
-
-uniform bool uBackscatterEnabled;
-uniform float uBackscatterIntensity;
-uniform vec3 uBackscatterColor;
-uniform float uBackscatterPower;
-uniform float uFrontScatterStrength;
-uniform float uRimSSSStrength;
-
-uniform bool uNormalMixEnabled;
-uniform float uNormalMixFactor;
-
-uniform bool uSpecularEnabled;
-uniform float uSpecularIntensity;
-uniform vec3 uSpecularColor;
-uniform float uSpecularPower;
-
-uniform bool uAoEnabled;
-uniform float uAoIntensity;
-uniform float uDensityThreshold;
-uniform float uDensityRange;
-uniform float uGrassMiddleStrength;
-
 #include <common>
 #include <packing>
 #include <dithering_pars_fragment>
@@ -572,6 +549,13 @@ varying vec3 vNormal2;
 varying vec3 vWorldPosition;
 varying float vFogDepth;
 // vViewPosition is provided by Three.js shader chunks, don't declare it here
+
+// Fog uniforms
+uniform bool uFogEnabled;
+uniform float uFogNear;
+uniform float uFogFar;
+uniform vec3 uFogColor;
+uniform float uFogIntensity;
 
 // OKLAB color space conversion - GLSL 1.0 compatible
 mat3 kLMStoCONE = mat3(
@@ -637,18 +621,16 @@ void main() {
   );
   
   // Density calculation - checks if terrain is sandy (lower areas)
-  float isSandy = clamp(linearstep(uDensityThreshold, uDensityThreshold - uDensityRange, height), 0.0, 1.0);
+  float isSandy = clamp(linearstep(-11.0, -14.0, height), 0.0, 1.0);
   float density = 1.0 - isSandy;
   
   // Ambient Occlusion - darker at base, brighter at tip
-  if (uAoEnabled) {
-    float aoForDensity = mix(1.0, 0.25, density);
-    float ao = mix(aoForDensity, 1.0, pow(heightPercent, 2.0));
-    diffuseColor.rgb *= ao * uAoIntensity;
-  }
+  float aoForDensity = mix(1.0, 0.25, density);
+  float ao = mix(aoForDensity, 1.0, pow(heightPercent, 2.0));
   
-  // Apply grass middle to color
-  diffuseColor.rgb *= mix(uGrassMiddleStrength, 1.0, grassMiddle);
+  // Apply grass middle and AO to color
+  diffuseColor.rgb *= mix(0.85, 1.0, grassMiddle);
+  diffuseColor.rgb *= ao;
   
   #include <logdepthbuf_fragment>
   #include <map_fragment>
@@ -669,8 +651,7 @@ void main() {
   // normal is already provided by Three.js after normal_fragment_maps
   vec3 baseNormal = normalize(normal);
   vec3 normal2 = normalize(vNormal2);
-  float mixFactor = uNormalMixEnabled ? uNormalMixFactor : vGrassParams.w;
-  normal = normalize(mix(baseNormal, normal2, mixFactor));
+  normal = normalize(mix(baseNormal, normal2, vGrassParams.w));
   
   #include <emissivemap_fragment>
   
@@ -701,27 +682,26 @@ void main() {
   float grassThickness = (1.0 - heightPercent) * 0.8 + 0.2;
   
   // Enhanced backscatter calculation with multiple scattering layers
-  if (uBackscatterEnabled) {
-    float sssBack = pow(backScatter, uBackscatterPower) * grassThickness;
-    float sssFront = pow(frontScatter, uBackscatterPower * 0.5) * grassThickness * uFrontScatterStrength;
-    float rimSSS = pow(rim, 2.0) * grassThickness * uRimSSSStrength;
-    
-    // Combine all subsurface scattering contributions
-    float totalSSS = sssBack + sssFront + rimSSS;
-    totalSSS = clamp(totalSSS, 0.0, 1.0);
-    
-    // Apply backscatter to diffuse lighting
-    vec3 backscatterContribution = uBackscatterColor * totalSSS * uBackscatterIntensity;
-    reflectedLight.directDiffuse += backscatterContribution;
-  }
+  float sssBack = pow(backScatter, 2.0) * grassThickness;
+  float sssFront = pow(frontScatter, 1.5) * grassThickness * 0.3;
+  float rimSSS = pow(rim, 2.0) * grassThickness * 0.5;
+  
+  // Combine all subsurface scattering contributions
+  float totalSSS = sssBack + sssFront + rimSSS;
+  totalSSS = clamp(totalSSS, 0.0, 1.0);
+  
+  // Backscatter color (warm, slightly green-tinted for grass translucency)
+  vec3 backscatterColor = vec3(0.8, 1.0, 0.7) * 0.4;
+  
+  // Apply backscatter to diffuse lighting
+  vec3 backscatterContribution = backscatterColor * totalSSS * 0.5;
+  reflectedLight.directDiffuse += backscatterContribution;
   
   // Enhanced specular for better grass shine
-  if (uSpecularEnabled) {
-    vec3 reflectDir = reflect(-lightDir, normal);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), uSpecularPower);
-    vec3 specularContribution = uSpecularColor * spec * uSpecularIntensity;
-    reflectedLight.directSpecular += specularContribution;
-  }
+  vec3 reflectDir = reflect(-lightDir, normal);
+  float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
+  vec3 specularColor = vec3(1.0, 1.0, 0.95);
+  reflectedLight.directSpecular += specularColor * spec * 0.3;
   
   vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + totalEmissiveRadiance;
   
@@ -734,14 +714,17 @@ void main() {
     // Calculate fog factor (0 = no fog, 1 = full fog)
     float fogFactor = clamp((fogDepth - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
     
+    // Apply fog intensity
+    fogFactor *= uFogIntensity;
+    
     // Sky color for fog (using OKLAB for better color mixing)
-    vec3 fogSkyColorRGB = uFogColor * uFogIntensity;
+    vec3 fogSkyColorRGB = uFogColor;
     
     // Convert to OKLAB for better color mixing
     vec3 outgoingLightOklab = rgbToOklab(outgoingLight);
     vec3 fogSkyColorOklab = rgbToOklab(fogSkyColorRGB);
     
-    // Apply fog in OKLAB space - linear interpolation for very visible fog
+    // Apply fog in OKLAB space - linear interpolation
     vec3 foggedOklab = mix(outgoingLightOklab, fogSkyColorOklab, fogFactor);
     
     // Convert back to RGB
@@ -831,35 +814,23 @@ export function GrassPatch({
   playerPosition = null, // Optional player position for interaction
   castShadow = false, // Grass doesn't cast shadows (performance)
   receiveShadow = true, // Grass receives shadows
+  fogEnabled = true, // Fog controls
+  fogNear = 5.0,
+  fogFar = 50.0,
+  fogColor = "#4f74af",
+  fogIntensity = 1.0,
+  baseColor1 = "#051303", // Grass color controls
+  baseColor2 = "#061a03",
+  tipColor1 = "#a6cc40",
+  tipColor2 = "#cce666",
 }) {
-  // Get controls from Leva
-  const controls = useGrassClaude3Controls();
-
   const materialRef = useRef();
   const meshRef = useRef();
-
-  // Convert color strings to THREE.Color with refs for updates
-  // Leva flattens all folders, so controls are at top level
-  const fogColor = useRef(new THREE.Color(controls.fogColor || "#4f74af"));
-  const backscatterColor = useRef(
-    new THREE.Color(controls.backscatterColor || "#516647")
-  );
-  const specularColor = useRef(
-    new THREE.Color(controls.specularColor || "#fffff2")
-  );
-
-  // Update colors when controls change
-  useEffect(() => {
-    if (controls.fogColor) {
-      fogColor.current.set(controls.fogColor);
-    }
-    if (controls.backscatterColor) {
-      backscatterColor.current.set(controls.backscatterColor);
-    }
-    if (controls.specularColor) {
-      specularColor.current.set(controls.specularColor);
-    }
-  }, [controls.fogColor, controls.backscatterColor, controls.specularColor]);
+  const fogColorRef = useRef(new THREE.Color(fogColor));
+  const baseColor1Ref = useRef(new THREE.Color(baseColor1));
+  const baseColor2Ref = useRef(new THREE.Color(baseColor2));
+  const tipColor1Ref = useRef(new THREE.Color(tipColor1));
+  const tipColor2Ref = useRef(new THREE.Color(tipColor2));
 
   // Create geometry once
   const geometry = useMemo(
@@ -912,58 +883,18 @@ export function GrassPatch({
       shader.uniforms.grassTexture = { value: null };
       shader.uniforms.grassLODColour = { value: new THREE.Vector3(0, 0, 1) };
 
-      // Add custom uniforms for advanced features
-      // Leva flattens all folders, so controls are at top level
-      shader.uniforms.uFogEnabled = { value: controls.fogEnabled ?? true };
-      shader.uniforms.uFogNear = { value: controls.fogNear ?? 5.0 };
-      shader.uniforms.uFogFar = { value: controls.fogFar ?? 50.0 };
-      shader.uniforms.uFogColor = { value: fogColor.current };
-      shader.uniforms.uFogIntensity = { value: controls.fogIntensity ?? 1.0 };
+      // Fog uniforms
+      shader.uniforms.uFogEnabled = { value: fogEnabled };
+      shader.uniforms.uFogNear = { value: fogNear };
+      shader.uniforms.uFogFar = { value: fogFar };
+      shader.uniforms.uFogColor = { value: fogColorRef.current };
+      shader.uniforms.uFogIntensity = { value: fogIntensity };
 
-      shader.uniforms.uBackscatterEnabled = {
-        value: controls.backscatterEnabled ?? true,
-      };
-      shader.uniforms.uBackscatterIntensity = {
-        value: controls.backscatterIntensity ?? 0.5,
-      };
-      shader.uniforms.uBackscatterColor = { value: backscatterColor.current };
-      shader.uniforms.uBackscatterPower = {
-        value: controls.backscatterPower ?? 2.0,
-      };
-      shader.uniforms.uFrontScatterStrength = {
-        value: controls.frontScatterStrength ?? 0.3,
-      };
-      shader.uniforms.uRimSSSStrength = {
-        value: controls.rimSSSStrength ?? 0.5,
-      };
-
-      shader.uniforms.uNormalMixEnabled = {
-        value: controls.normalMixEnabled ?? true,
-      };
-      shader.uniforms.uNormalMixFactor = {
-        value: controls.normalMixFactor ?? 0.5,
-      };
-
-      shader.uniforms.uSpecularEnabled = {
-        value: controls.specularEnabled ?? true,
-      };
-      shader.uniforms.uSpecularIntensity = {
-        value: controls.specularIntensity ?? 0.3,
-      };
-      shader.uniforms.uSpecularColor = { value: specularColor.current };
-      shader.uniforms.uSpecularPower = {
-        value: controls.specularPower ?? 32.0,
-      };
-
-      shader.uniforms.uAoEnabled = { value: controls.aoEnabled ?? true };
-      shader.uniforms.uAoIntensity = { value: controls.aoIntensity ?? 1.0 };
-      shader.uniforms.uDensityThreshold = {
-        value: controls.densityThreshold ?? -11.0,
-      };
-      shader.uniforms.uDensityRange = { value: controls.densityRange ?? 3.0 };
-      shader.uniforms.uGrassMiddleStrength = {
-        value: controls.grassMiddleStrength ?? 0.85,
-      };
+      // Grass color uniforms
+      shader.uniforms.uBaseColor1 = { value: baseColor1Ref.current };
+      shader.uniforms.uBaseColor2 = { value: baseColor2Ref.current };
+      shader.uniforms.uTipColor1 = { value: tipColor1Ref.current };
+      shader.uniforms.uTipColor2 = { value: tipColor2Ref.current };
 
       // Replace shaders with complete versions
       shader.vertexShader = grassVertexShader;
@@ -989,6 +920,14 @@ export function GrassPatch({
     terrainHeight,
     terrainOffset,
     terrainSize,
+    fogEnabled,
+    fogNear,
+    fogFar,
+    fogIntensity,
+    baseColor1,
+    baseColor2,
+    tipColor1,
+    tipColor2,
   ]);
 
   // Cleanup geometry
@@ -997,6 +936,19 @@ export function GrassPatch({
       geometry.dispose();
     };
   }, [geometry]);
+
+  // Update fog color when it changes
+  useEffect(() => {
+    fogColorRef.current.set(fogColor);
+  }, [fogColor]);
+
+  // Update grass colors when they change
+  useEffect(() => {
+    baseColor1Ref.current.set(baseColor1);
+    baseColor2Ref.current.set(baseColor2);
+    tipColor1Ref.current.set(tipColor1);
+    tipColor2Ref.current.set(tipColor2);
+  }, [baseColor1, baseColor2, tipColor1, tipColor2]);
 
   // Update uniforms each frame
   useFrame((state) => {
@@ -1009,39 +961,18 @@ export function GrassPatch({
         shader.uniforms.playerPos.value.copy(playerPosition);
       }
 
-      // Update custom uniforms from controls
-      // Leva flattens all folders, so controls are at top level
-      shader.uniforms.uFogEnabled.value = controls.fogEnabled;
-      shader.uniforms.uFogNear.value = controls.fogNear;
-      shader.uniforms.uFogFar.value = controls.fogFar;
-      fogColor.current.set(controls.fogColor);
-      shader.uniforms.uFogColor.value.copy(fogColor.current);
-      shader.uniforms.uFogIntensity.value = controls.fogIntensity;
+      // Update fog uniforms
+      shader.uniforms.uFogEnabled.value = fogEnabled;
+      shader.uniforms.uFogNear.value = fogNear;
+      shader.uniforms.uFogFar.value = fogFar;
+      shader.uniforms.uFogColor.value.copy(fogColorRef.current);
+      shader.uniforms.uFogIntensity.value = fogIntensity;
 
-      shader.uniforms.uBackscatterEnabled.value = controls.backscatterEnabled;
-      shader.uniforms.uBackscatterIntensity.value =
-        controls.backscatterIntensity;
-      backscatterColor.current.set(controls.backscatterColor);
-      shader.uniforms.uBackscatterColor.value.copy(backscatterColor.current);
-      shader.uniforms.uBackscatterPower.value = controls.backscatterPower;
-      shader.uniforms.uFrontScatterStrength.value =
-        controls.frontScatterStrength;
-      shader.uniforms.uRimSSSStrength.value = controls.rimSSSStrength;
-
-      shader.uniforms.uNormalMixEnabled.value = controls.normalMixEnabled;
-      shader.uniforms.uNormalMixFactor.value = controls.normalMixFactor;
-
-      shader.uniforms.uSpecularEnabled.value = controls.specularEnabled;
-      shader.uniforms.uSpecularIntensity.value = controls.specularIntensity;
-      specularColor.current.set(controls.specularColor);
-      shader.uniforms.uSpecularColor.value.copy(specularColor.current);
-      shader.uniforms.uSpecularPower.value = controls.specularPower;
-
-      shader.uniforms.uAoEnabled.value = controls.aoEnabled;
-      shader.uniforms.uAoIntensity.value = controls.aoIntensity;
-      shader.uniforms.uDensityThreshold.value = controls.densityThreshold;
-      shader.uniforms.uDensityRange.value = controls.densityRange;
-      shader.uniforms.uGrassMiddleStrength.value = controls.grassMiddleStrength;
+      // Update grass color uniforms
+      shader.uniforms.uBaseColor1.value.copy(baseColor1Ref.current);
+      shader.uniforms.uBaseColor2.value.copy(baseColor2Ref.current);
+      shader.uniforms.uTipColor1.value.copy(tipColor1Ref.current);
+      shader.uniforms.uTipColor2.value.copy(tipColor2Ref.current);
     }
   });
 
