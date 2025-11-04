@@ -595,14 +595,9 @@ export const GodotCharacterHybrid = ({
           ? Math.atan2(movement.x, 1)
           : Math.atan2(movement.x, movement.z);
 
-        // In follow-orbit mode, use camera rotation (including mouse orbit) for movement direction
-        // Otherwise use character rotation
-        const movementRotation =
-          cameraMode === "follow-orbit"
-            ? rotationTarget.current +
-              mouseOrbitOffset.current +
-              baseMovementAngle
-            : rotationTarget.current + baseMovementAngle;
+        // Movement direction is based on character rotation, NOT camera orbit
+        // Camera orbit should only affect camera position, not movement direction
+        const movementRotation = rotationTarget.current + baseMovementAngle;
 
         let intendedVelX = Math.sin(movementRotation) * speed;
         let intendedVelZ = Math.cos(movementRotation) * speed;
