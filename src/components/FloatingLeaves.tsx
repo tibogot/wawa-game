@@ -37,6 +37,8 @@ export const FloatingLeaves: React.FC<FloatingLeavesProps> = ({
     windInfluence,
     gravity,
     useTexture,
+    enableViewThickening,
+    viewThickenStrength,
   } = useControls("🍂 Floating Leaves", {
     enabled: { value: defaultEnableLeaves, label: "Enable Leaves" },
     count: {
@@ -82,6 +84,17 @@ export const FloatingLeaves: React.FC<FloatingLeavesProps> = ({
       step: 0.0005,
     },
     useTexture: { value: defaultUseTexture, label: "Use Texture" },
+    enableViewThickening: {
+      value: true,
+      label: "Enable View Thickening",
+    },
+    viewThickenStrength: {
+      value: 0.3,
+      label: "Thickening Strength",
+      min: 0.0,
+      max: 1.0,
+      step: 0.05,
+    },
   });
   const instancedMeshRef = useRef<THREE.InstancedMesh>(null);
   const { windUniforms } = useGlobalWind();
@@ -158,14 +171,67 @@ export const FloatingLeaves: React.FC<FloatingLeavesProps> = ({
       );
     }
 
-    return new THREE.MeshBasicMaterial({
+    const material = new THREE.MeshStandardMaterial({
       map: leafTexture || fallbackTexture,
       transparent: true,
       opacity: 0.8,
       side: THREE.DoubleSide,
       alphaTest: 0.1,
     });
-  }, [leafTexture, useTexture]);
+
+    // Add view-space thickening shader effect
+    if (enableViewThickening) {
+      material.onBeforeCompile = (shader) => {
+        // Inject view-space thickening code
+        shader.vertexShader = shader.vertexShader.replace(
+          "#include <begin_vertex>",
+          `
+          #include <begin_vertex>
+          
+          // View-space thickening: Prevents leaves from disappearing when viewed edge-on
+          // Calculate instance world position (for instanced meshes)
+          vec3 instanceLocalPos = vec3(instanceMatrix[3].xyz);
+          vec4 instancePosWorld = modelMatrix * vec4(instanceLocalPos, 1.0);
+          vec3 instanceWorldPos = instancePosWorld.xyz;
+          
+          // Get camera position in world space
+          vec3 camPos = (inverse(viewMatrix) * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+          
+          // Get view direction from camera to leaf
+          vec3 viewDir = normalize(camPos - instanceWorldPos);
+          
+          // Leaf face normal in world space (transform from instance matrix)
+          // For a plane, the normal is along the Z axis in local space
+          vec3 leafNormalLocal = vec3(0.0, 0.0, 1.0);
+          vec3 leafNormal = normalize((modelMatrix * instanceMatrix * vec4(leafNormalLocal, 0.0)).xyz);
+          
+          // Calculate how edge-on we're viewing the leaf
+          float viewDotNormal = abs(dot(viewDir, leafNormal));
+          
+          // Thickening factor: high when edge-on (low dot), low when facing camera
+          float thickenFactor = pow(1.0 - viewDotNormal, 2.0);
+          
+          // Apply smoothing to avoid visual artifacts
+          thickenFactor *= smoothstep(0.0, 0.3, viewDotNormal);
+          
+          // Apply thickening by pushing vertices outward along the normal
+          vec3 offset = leafNormal * thickenFactor * ${viewThickenStrength.toFixed(
+            2
+          )} * ${leafSize.toFixed(2)} * 0.5;
+          transformed += offset;
+          `
+        );
+      };
+    }
+
+    return material;
+  }, [
+    leafTexture,
+    useTexture,
+    enableViewThickening,
+    viewThickenStrength,
+    leafSize,
+  ]);
 
   // Update material when texture loads
   useEffect(() => {
@@ -311,10 +377,14 @@ export const FloatingLeaves: React.FC<FloatingLeavesProps> = ({
         }
       }
 
-      // Update rotation
-      leafData.rotations[i3] += leafData.velocities[i3] * 10;
-      leafData.rotations[i3 + 1] += leafData.velocities[i3 + 1] * 5;
-      leafData.rotations[i3 + 2] += leafData.velocities[i3 + 2] * 10;
+      // Update rotation - smoother, slower rotation
+      // Use a small constant rotation speed with subtle velocity influence
+      const rotationSpeed = 0.001; // Base rotation speed
+      leafData.rotations[i3] += rotationSpeed + leafData.velocities[i3] * 0.5;
+      leafData.rotations[i3 + 1] +=
+        rotationSpeed * 0.5 + leafData.velocities[i3 + 1] * 0.2;
+      leafData.rotations[i3 + 2] +=
+        rotationSpeed + leafData.velocities[i3 + 2] * 0.5;
 
       // Set instance matrix
       position.set(
@@ -346,6 +416,7 @@ export const FloatingLeaves: React.FC<FloatingLeavesProps> = ({
       ref={instancedMeshRef}
       args={[leafGeometry, leafMaterial, count]}
       frustumCulled={false}
+      castShadow
     />
   );
 };

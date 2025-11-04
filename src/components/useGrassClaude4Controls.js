@@ -10,7 +10,7 @@ export function useGrassClaude4Controls() {
           label: "🌿 Enable Grass Claude 4",
         },
         grassHeight: {
-          value: 1.5,
+          value: 1,
           min: 0.5,
           max: 5.0,
           step: 0.1,
@@ -307,7 +307,7 @@ export function useGrassClaude4Controls() {
         fog: folder(
           {
             fogEnabled: {
-              value: true,
+              value: false,
               label: "Enable Fog",
             },
             fogNear: {

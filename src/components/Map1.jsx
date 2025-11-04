@@ -27,6 +27,7 @@ import { WindFlag } from "./WindFlag";
 import { useWindFlagControls } from "./useWindFlagControls";
 import { RipplePlane } from "./RipplePlane";
 import { FloatingLeaves2 } from "./FloatingLeaves2";
+import { FloatingLeaves } from "./FloatingLeaves";
 import { Skybox } from "./Skybox";
 import { Tree } from "./Tree";
 import { InstancedTrees } from "./InstancedTrees";
@@ -625,11 +626,14 @@ export const Map1 = ({
         />
       )}
 
-      {/* Floating Leaves 2 - Follows character position */}
+      {/* Floating Leaves 2 - Tornado animation around character */}
       <FloatingLeaves2
         characterPosition={characterPosition || fallbackPosition}
         getTerrainHeight={getGroundHeight}
       />
+
+      {/* Floating Leaves - Regular floating leaves */}
+      <FloatingLeaves getTerrainHeight={getGroundHeight} />
 
       {/* Tree */}
       {treeEnabled && (
