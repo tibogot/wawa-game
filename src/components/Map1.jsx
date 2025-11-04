@@ -73,10 +73,39 @@ export const Map1 = ({
     grassClaude4Enabled,
     grassHeight,
     gridSize,
+    patchSpacing,
+    segments,
+    numGrass,
+    patchSize,
+    grassWidth,
+    lodDistance,
+    maxDistance,
     baseColor1,
     baseColor2,
     tipColor1,
     tipColor2,
+    backscatterEnabled,
+    backscatterIntensity,
+    backscatterColor,
+    backscatterPower,
+    frontScatterStrength,
+    rimSSSStrength,
+    specularEnabled,
+    specularIntensity,
+    specularColor,
+    specularPower,
+    specularScale,
+    lightDirectionX,
+    lightDirectionY,
+    lightDirectionZ,
+    windEnabled,
+    windStrength,
+    windDirectionScale,
+    windDirectionSpeed,
+    windStrengthScale,
+    windStrengthSpeed,
+    aoEnabled,
+    aoIntensity,
     fogEnabled,
     fogNear,
     fogFar,
@@ -402,20 +431,42 @@ export const Map1 = ({
       {grassClaude4Enabled && (
         <GrassField4
           gridSize={gridSize}
-          patchSpacing={10}
+          patchSpacing={patchSpacing}
           centerPosition={[0, 0, 0]}
           playerPosition={characterPosition}
-          segments={6}
-          numGrass={32 * 32 * 3}
-          patchSize={10}
-          grassWidth={0.1}
+          segments={segments}
+          numGrass={numGrass}
+          patchSize={patchSize}
+          grassWidth={grassWidth}
           grassHeight={grassHeight}
-          lodDistance={15}
-          maxDistance={100}
+          lodDistance={lodDistance}
+          maxDistance={maxDistance}
           baseColor1={baseColor1}
           baseColor2={baseColor2}
           tipColor1={tipColor1}
           tipColor2={tipColor2}
+          backscatterEnabled={backscatterEnabled}
+          backscatterIntensity={backscatterIntensity}
+          backscatterColor={backscatterColor}
+          backscatterPower={backscatterPower}
+          frontScatterStrength={frontScatterStrength}
+          rimSSSStrength={rimSSSStrength}
+          specularEnabled={specularEnabled}
+          specularIntensity={specularIntensity}
+          specularColor={specularColor}
+          specularPower={specularPower}
+          specularScale={specularScale}
+          lightDirectionX={lightDirectionX}
+          lightDirectionY={lightDirectionY}
+          lightDirectionZ={lightDirectionZ}
+          windEnabled={windEnabled}
+          windStrength={windStrength}
+          windDirectionScale={windDirectionScale}
+          windDirectionSpeed={windDirectionSpeed}
+          windStrengthScale={windStrengthScale}
+          windStrengthSpeed={windStrengthSpeed}
+          aoEnabled={aoEnabled}
+          aoIntensity={aoIntensity}
           fogEnabled={fogEnabled}
           fogNear={fogNear}
           fogFar={fogFar}

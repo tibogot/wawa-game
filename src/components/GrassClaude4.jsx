@@ -254,6 +254,14 @@ uniform vec3 uBaseColor2;
 uniform vec3 uTipColor1;
 uniform vec3 uTipColor2;
 
+// Wind uniforms
+uniform bool uWindEnabled;
+uniform float uWindStrength;
+uniform float uWindDirectionScale;
+uniform float uWindDirectionSpeed;
+uniform float uWindStrengthScale;
+uniform float uWindStrengthSpeed;
+
 attribute float vertIndex;
 
 // Utility functions
@@ -382,12 +390,16 @@ void main() {
   float y = heightPercent * grassTotalHeight;
 
   // Wind
-  float windDir = noise12(grassBladeWorldPos.xz * 0.05 + 0.05 * time);
-  float windNoiseSample = noise12(grassBladeWorldPos.xz * 0.25 + time * 1.0);
-  float windLeanAngle = remap(windNoiseSample, -1.0, 1.0, 0.25, 1.0);
-  windLeanAngle = easeIn(windLeanAngle, 2.0) * 1.25;
-  vec3 windAxis = vec3(cos(windDir), 0.0, sin(windDir));
-  windLeanAngle *= heightPercent;
+  float windLeanAngle = 0.0;
+  vec3 windAxis = vec3(1.0, 0.0, 0.0);
+  if (uWindEnabled) {
+    float windDir = noise12(grassBladeWorldPos.xz * uWindDirectionScale + uWindDirectionSpeed * time);
+    float windNoiseSample = noise12(grassBladeWorldPos.xz * uWindStrengthScale + time * uWindStrengthSpeed);
+    windLeanAngle = remap(windNoiseSample, -1.0, 1.0, 0.25, 1.0);
+    windLeanAngle = easeIn(windLeanAngle, 2.0) * uWindStrength;
+    windAxis = vec3(cos(windDir), 0.0, sin(windDir));
+    windLeanAngle *= heightPercent;
+  }
 
   // Player interaction
   float distToPlayer = distance(grassBladeWorldPos.xz, playerPos.xz);
@@ -557,6 +569,26 @@ uniform float uFogFar;
 uniform vec3 uFogColor;
 uniform float uFogIntensity;
 
+// Backscatter/SSS uniforms
+uniform bool uBackscatterEnabled;
+uniform float uBackscatterIntensity;
+uniform vec3 uBackscatterColor;
+uniform float uBackscatterPower;
+uniform float uFrontScatterStrength;
+uniform float uRimSSSStrength;
+
+// Specular uniforms
+uniform bool uSpecularEnabled;
+uniform float uSpecularIntensity;
+uniform vec3 uSpecularColor;
+uniform float uSpecularPower;
+uniform float uSpecularScale;
+uniform vec3 uLightDirection;
+
+// Advanced uniforms
+uniform bool uAoEnabled;
+uniform float uAoIntensity;
+
 // OKLAB color space conversion - GLSL 1.0 compatible
 mat3 kLMStoCONE = mat3(
   4.0767245293, -1.2681437731, -0.0041119885,
@@ -624,13 +656,15 @@ void main() {
   float isSandy = clamp(linearstep(-11.0, -14.0, height), 0.0, 1.0);
   float density = 1.0 - isSandy;
   
-  // Ambient Occlusion - darker at base, brighter at tip
-  float aoForDensity = mix(1.0, 0.25, density);
-  float ao = mix(aoForDensity, 1.0, pow(heightPercent, 2.0));
-  
-  // Apply grass middle and AO to color
+  // Apply grass middle to color
   diffuseColor.rgb *= mix(0.85, 1.0, grassMiddle);
-  diffuseColor.rgb *= ao;
+  
+  // Ambient Occlusion - darker at base, brighter at tip
+  if (uAoEnabled) {
+    float aoForDensity = mix(1.0, 0.25, density);
+    float ao = mix(aoForDensity, 1.0, pow(heightPercent, 2.0));
+    diffuseColor.rgb *= ao * uAoIntensity;
+  }
   
   #include <logdepthbuf_fragment>
   #include <map_fragment>
@@ -661,47 +695,54 @@ void main() {
   #include <lights_fragment_end>
   
   // Custom lighting with backscatter for enhanced realism
-  // Calculate backscatter (subsurface scattering) for translucency effect
-  // Use vViewPosition for view direction (from Three.js shader chunks)
-  vec3 viewDir = normalize(-vViewPosition);
-  // Use normal (modified by our normal mixing above) for geometry normal
-  // normal is already normalized from Three.js, just use it directly
-  
-  // Main directional light (typically sun)
-  vec3 lightDir = normalize(vec3(1.0, 1.0, 0.5));
-  
-  // Calculate backscatter - light coming through the grass from behind
-  float backScatter = max(dot(-lightDir, normal), 0.0);
-  float frontScatter = max(dot(lightDir, normal), 0.0);
-  
-  // Rim lighting for edges (translucency effect)
-  float rim = 1.0 - max(dot(normal, viewDir), 0.0);
-  rim = pow(rim, 1.5);
-  
-  // Grass thickness factor (thicker at base, thinner at tips) - heightPercent already declared above
-  float grassThickness = (1.0 - heightPercent) * 0.8 + 0.2;
-  
-  // Enhanced backscatter calculation with multiple scattering layers
-  float sssBack = pow(backScatter, 2.0) * grassThickness;
-  float sssFront = pow(frontScatter, 1.5) * grassThickness * 0.3;
-  float rimSSS = pow(rim, 2.0) * grassThickness * 0.5;
-  
-  // Combine all subsurface scattering contributions
-  float totalSSS = sssBack + sssFront + rimSSS;
-  totalSSS = clamp(totalSSS, 0.0, 1.0);
-  
-  // Backscatter color (warm, slightly green-tinted for grass translucency)
-  vec3 backscatterColor = vec3(0.8, 1.0, 0.7) * 0.4;
-  
-  // Apply backscatter to diffuse lighting
-  vec3 backscatterContribution = backscatterColor * totalSSS * 0.5;
-  reflectedLight.directDiffuse += backscatterContribution;
+  if (uBackscatterEnabled) {
+    // Calculate backscatter (subsurface scattering) for translucency effect
+    // Use vViewPosition for view direction (from Three.js shader chunks)
+    vec3 viewDir = normalize(-vViewPosition);
+    // Use normal (modified by our normal mixing above) for geometry normal
+    // normal is already normalized from Three.js, just use it directly
+    
+    // Main directional light (typically sun)
+    vec3 lightDir = normalize(vec3(1.0, 1.0, 0.5));
+    
+    // Calculate backscatter - light coming through the grass from behind
+    float backScatter = max(dot(-lightDir, normal), 0.0);
+    float frontScatter = max(dot(lightDir, normal), 0.0);
+    
+    // Rim lighting for edges (translucency effect)
+    float rim = 1.0 - max(dot(normal, viewDir), 0.0);
+    rim = pow(rim, 1.5);
+    
+    // Grass thickness factor (thicker at base, thinner at tips) - heightPercent already declared above
+    float grassThickness = (1.0 - heightPercent) * 0.8 + 0.2;
+    
+    // Enhanced backscatter calculation with multiple scattering layers
+    float sssBack = pow(backScatter, uBackscatterPower) * grassThickness;
+    float sssFront = pow(frontScatter, 1.5) * grassThickness * uFrontScatterStrength;
+    float rimSSS = pow(rim, 2.0) * grassThickness * uRimSSSStrength;
+    
+    // Combine all subsurface scattering contributions
+    float totalSSS = sssBack + sssFront + rimSSS;
+    totalSSS = clamp(totalSSS, 0.0, 1.0);
+    
+    // Backscatter color (warm, slightly green-tinted for grass translucency)
+    // Original code multiplies by 0.4, so we do the same to match default behavior
+    vec3 backscatterColor = uBackscatterColor * 0.4;
+    
+    // Apply backscatter to diffuse lighting
+    vec3 backscatterContribution = backscatterColor * totalSSS * uBackscatterIntensity;
+    reflectedLight.directDiffuse += backscatterContribution;
+  }
   
   // Enhanced specular for better grass shine
-  vec3 reflectDir = reflect(-lightDir, normal);
-  float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
-  vec3 specularColor = vec3(1.0, 1.0, 0.95);
-  reflectedLight.directSpecular += specularColor * spec * 0.3;
+  if (uSpecularEnabled) {
+    vec3 viewDir = normalize(-vViewPosition);
+    vec3 lightDir = normalize(uLightDirection);
+    vec3 reflectDir = reflect(-lightDir, normal);
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), uSpecularPower);
+    spec *= uSpecularScale; // Apply scale to control highlight size/spread
+    reflectedLight.directSpecular += uSpecularColor * spec * uSpecularIntensity;
+  }
   
   vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + totalEmissiveRadiance;
   
@@ -823,6 +864,28 @@ export function GrassPatch({
   baseColor2 = "#061a03",
   tipColor1 = "#a6cc40",
   tipColor2 = "#cce666",
+  backscatterEnabled = true, // Backscatter/SSS controls
+  backscatterIntensity = 0.5,
+  backscatterColor = "#ccffb3",
+  backscatterPower = 2.0,
+  frontScatterStrength = 0.3,
+  rimSSSStrength = 0.5,
+  specularEnabled = true, // Specular controls
+  specularIntensity = 0.3,
+  specularColor = "#fffff2",
+  specularPower = 32.0,
+  specularScale = 1.0,
+  lightDirectionX = 1.0,
+  lightDirectionY = 1.0,
+  lightDirectionZ = 0.5,
+  aoEnabled = true, // Advanced controls
+  aoIntensity = 1.0,
+  windEnabled = true, // Wind controls
+  windStrength = 1.25,
+  windDirectionScale = 0.05,
+  windDirectionSpeed = 0.05,
+  windStrengthScale = 0.25,
+  windStrengthSpeed = 1.0,
 }) {
   const materialRef = useRef();
   const meshRef = useRef();
@@ -831,6 +894,8 @@ export function GrassPatch({
   const baseColor2Ref = useRef(new THREE.Color(baseColor2));
   const tipColor1Ref = useRef(new THREE.Color(tipColor1));
   const tipColor2Ref = useRef(new THREE.Color(tipColor2));
+  const backscatterColorRef = useRef(new THREE.Color(backscatterColor));
+  const specularColorRef = useRef(new THREE.Color(specularColor));
 
   // Create geometry once
   const geometry = useMemo(
@@ -896,6 +961,42 @@ export function GrassPatch({
       shader.uniforms.uTipColor1 = { value: tipColor1Ref.current };
       shader.uniforms.uTipColor2 = { value: tipColor2Ref.current };
 
+      // Wind uniforms
+      shader.uniforms.uWindEnabled = { value: windEnabled };
+      shader.uniforms.uWindStrength = { value: windStrength };
+      shader.uniforms.uWindDirectionScale = { value: windDirectionScale };
+      shader.uniforms.uWindDirectionSpeed = { value: windDirectionSpeed };
+      shader.uniforms.uWindStrengthScale = { value: windStrengthScale };
+      shader.uniforms.uWindStrengthSpeed = { value: windStrengthSpeed };
+
+      // Backscatter/SSS uniforms
+      shader.uniforms.uBackscatterEnabled = { value: backscatterEnabled };
+      shader.uniforms.uBackscatterIntensity = { value: backscatterIntensity };
+      shader.uniforms.uBackscatterColor = {
+        value: backscatterColorRef.current,
+      };
+      shader.uniforms.uBackscatterPower = { value: backscatterPower };
+      shader.uniforms.uFrontScatterStrength = { value: frontScatterStrength };
+      shader.uniforms.uRimSSSStrength = { value: rimSSSStrength };
+
+      // Specular uniforms
+      shader.uniforms.uSpecularEnabled = { value: specularEnabled };
+      shader.uniforms.uSpecularIntensity = { value: specularIntensity };
+      shader.uniforms.uSpecularColor = { value: specularColorRef.current };
+      shader.uniforms.uSpecularPower = { value: specularPower };
+      shader.uniforms.uSpecularScale = { value: specularScale };
+      shader.uniforms.uLightDirection = {
+        value: new THREE.Vector3(
+          lightDirectionX,
+          lightDirectionY,
+          lightDirectionZ
+        ),
+      };
+
+      // Advanced uniforms
+      shader.uniforms.uAoEnabled = { value: aoEnabled };
+      shader.uniforms.uAoIntensity = { value: aoIntensity };
+
       // Replace shaders with complete versions
       shader.vertexShader = grassVertexShader;
       shader.fragmentShader = grassFragmentShader;
@@ -928,6 +1029,28 @@ export function GrassPatch({
     baseColor2,
     tipColor1,
     tipColor2,
+    backscatterEnabled,
+    backscatterIntensity,
+    backscatterColor,
+    backscatterPower,
+    frontScatterStrength,
+    rimSSSStrength,
+    specularEnabled,
+    specularIntensity,
+    specularColor,
+    specularPower,
+    specularScale,
+    lightDirectionX,
+    lightDirectionY,
+    lightDirectionZ,
+    aoEnabled,
+    aoIntensity,
+    windEnabled,
+    windStrength,
+    windDirectionScale,
+    windDirectionSpeed,
+    windStrengthScale,
+    windStrengthSpeed,
   ]);
 
   // Cleanup geometry
@@ -948,7 +1071,16 @@ export function GrassPatch({
     baseColor2Ref.current.set(baseColor2);
     tipColor1Ref.current.set(tipColor1);
     tipColor2Ref.current.set(tipColor2);
-  }, [baseColor1, baseColor2, tipColor1, tipColor2]);
+    backscatterColorRef.current.set(backscatterColor);
+    specularColorRef.current.set(specularColor);
+  }, [
+    baseColor1,
+    baseColor2,
+    tipColor1,
+    tipColor2,
+    backscatterColor,
+    specularColor,
+  ]);
 
   // Update uniforms each frame
   useFrame((state) => {
@@ -973,6 +1105,38 @@ export function GrassPatch({
       shader.uniforms.uBaseColor2.value.copy(baseColor2Ref.current);
       shader.uniforms.uTipColor1.value.copy(tipColor1Ref.current);
       shader.uniforms.uTipColor2.value.copy(tipColor2Ref.current);
+
+      // Update wind uniforms
+      shader.uniforms.uWindEnabled.value = windEnabled;
+      shader.uniforms.uWindStrength.value = windStrength;
+      shader.uniforms.uWindDirectionScale.value = windDirectionScale;
+      shader.uniforms.uWindDirectionSpeed.value = windDirectionSpeed;
+      shader.uniforms.uWindStrengthScale.value = windStrengthScale;
+      shader.uniforms.uWindStrengthSpeed.value = windStrengthSpeed;
+
+      // Update backscatter/SSS uniforms
+      shader.uniforms.uBackscatterEnabled.value = backscatterEnabled;
+      shader.uniforms.uBackscatterIntensity.value = backscatterIntensity;
+      shader.uniforms.uBackscatterColor.value.copy(backscatterColorRef.current);
+      shader.uniforms.uBackscatterPower.value = backscatterPower;
+      shader.uniforms.uFrontScatterStrength.value = frontScatterStrength;
+      shader.uniforms.uRimSSSStrength.value = rimSSSStrength;
+
+      // Update specular uniforms
+      shader.uniforms.uSpecularEnabled.value = specularEnabled;
+      shader.uniforms.uSpecularIntensity.value = specularIntensity;
+      shader.uniforms.uSpecularColor.value.copy(specularColorRef.current);
+      shader.uniforms.uSpecularPower.value = specularPower;
+      shader.uniforms.uSpecularScale.value = specularScale;
+      shader.uniforms.uLightDirection.value.set(
+        lightDirectionX,
+        lightDirectionY,
+        lightDirectionZ
+      );
+
+      // Update advanced uniforms
+      shader.uniforms.uAoEnabled.value = aoEnabled;
+      shader.uniforms.uAoIntensity.value = aoIntensity;
     }
   });
 
