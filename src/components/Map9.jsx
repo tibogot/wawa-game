@@ -8,10 +8,12 @@ import { SimonDevGrass21 } from "./SimonDevGrass21/SimonDevGrass21";
 import { SimonDevGrass22 } from "./SimonDevGrass22/SimonDevGrass22";
 import { SimonDevGrass23 } from "./SimonDevGrass23/SimonDevGrass23";
 import { GrassField as GrassField4 } from "./GrassClaude4";
+import { GrassField as GrassField5 } from "./GrassClaude5";
 import { useSimonDevGrass21Controls } from "./useSimonDevGrass21Controls";
 import { useSimonDevGrass22Controls } from "./useSimonDevGrass22Controls";
 import { useSimonDevGrass23Controls } from "./useSimonDevGrass23Controls";
 import { useGrassClaude4Controls } from "./useGrassClaude4Controls";
+import { useGrassClaude5Controls } from "./useGrassClaude5Controls";
 import { HeightFog } from "./HeightFog";
 import { useHeightFogControls } from "./useHeightFogControls";
 import { CloudSystem } from "./CloudSystem";
@@ -121,6 +123,56 @@ export const Map9 = forwardRef(
       fogColor: grassFogColor,
       fogIntensity: grassFogIntensity,
     } = useGrassClaude4Controls();
+
+    // Get GrassClaude5 controls
+    const {
+      grassClaude5Enabled,
+      grassHeight: grassHeight5,
+      gridSize: grassGridSize5,
+      patchSpacing: patchSpacing5,
+      segments: grassSegments5,
+      numGrass: numGrass5,
+      patchSize: patchSize5,
+      grassWidth: grassWidth5,
+      lodDistance: lodDistance5,
+      maxDistance: maxDistance5,
+      baseColor1: baseColor1_5,
+      baseColor2: baseColor2_5,
+      tipColor1: tipColor1_5,
+      tipColor2: tipColor2_5,
+      backscatterEnabled: backscatterEnabled5,
+      backscatterIntensity: backscatterIntensity5,
+      backscatterColor: backscatterColor5,
+      backscatterPower: backscatterPower5,
+      frontScatterStrength: frontScatterStrength5,
+      rimSSSStrength: rimSSSStrength5,
+      specularEnabled: specularEnabled5,
+      specularIntensity: specularIntensity5,
+      specularColor: specularColor5,
+      specularPower: specularPower5,
+      specularScale: specularScale5,
+      lightDirectionX: lightDirectionX5,
+      lightDirectionY: lightDirectionY5,
+      lightDirectionZ: lightDirectionZ5,
+      windEnabled: windEnabled5,
+      windStrength: windStrength5,
+      windDirectionScale: windDirectionScale5,
+      windDirectionSpeed: windDirectionSpeed5,
+      windStrengthScale: windStrengthScale5,
+      windStrengthSpeed: windStrengthSpeed5,
+      playerInteractionEnabled: playerInteractionEnabled5,
+      playerInteractionRange: playerInteractionRange5,
+      playerInteractionStrength: playerInteractionStrength5,
+      normalMixEnabled: normalMixEnabled5,
+      normalMixFactor: normalMixFactor5,
+      aoEnabled: aoEnabled5,
+      aoIntensity: aoIntensity5,
+      fogEnabled: grassFogEnabled5,
+      fogNear: grassFogNear5,
+      fogFar: grassFogFar5,
+      fogColor: grassFogColor5,
+      fogIntensity: grassFogIntensity5,
+    } = useGrassClaude5Controls();
 
     // Get Height Fog controls from hook
     const { heightFogEnabled, fogColor, fogHeight, fogNear, fogFar } =
@@ -617,6 +669,67 @@ export const Map9 = forwardRef(
               fogFar={grassFogFar}
               fogColor={grassFogColor}
               fogIntensity={grassFogIntensity}
+            />
+          )}
+
+        {/* GrassClaude5 Grass System - Only render when terrain is fully ready */}
+        {grassClaude5Enabled &&
+          isTerrainMeshReady &&
+          heightmapLookup &&
+          heightmapTexture && (
+            <GrassField5
+              gridSize={grassGridSize5}
+              patchSpacing={patchSpacing5}
+              centerPosition={[0, 0, 0]}
+              playerPosition={characterPosition || fallbackPosition}
+              getGroundHeight={getGroundHeight}
+              segments={grassSegments5}
+              numGrass={numGrass5}
+              patchSize={patchSize5}
+              grassWidth={grassWidth5}
+              grassHeight={grassHeight5}
+              lodDistance={lodDistance5}
+              maxDistance={maxDistance5}
+              heightmap={heightmapTexture}
+              terrainSize={2500}
+              terrainHeight={terrainHeight}
+              terrainOffset={terrainOffset}
+              baseColor1={baseColor1_5}
+              baseColor2={baseColor2_5}
+              tipColor1={tipColor1_5}
+              tipColor2={tipColor2_5}
+              backscatterEnabled={backscatterEnabled5}
+              backscatterIntensity={backscatterIntensity5}
+              backscatterColor={backscatterColor5}
+              backscatterPower={backscatterPower5}
+              frontScatterStrength={frontScatterStrength5}
+              rimSSSStrength={rimSSSStrength5}
+              specularEnabled={specularEnabled5}
+              specularIntensity={specularIntensity5}
+              specularColor={specularColor5}
+              specularPower={specularPower5}
+              specularScale={specularScale5}
+              lightDirectionX={lightDirectionX5}
+              lightDirectionY={lightDirectionY5}
+              lightDirectionZ={lightDirectionZ5}
+              windEnabled={windEnabled5}
+              windStrength={windStrength5}
+              windDirectionScale={windDirectionScale5}
+              windDirectionSpeed={windDirectionSpeed5}
+              windStrengthScale={windStrengthScale5}
+              windStrengthSpeed={windStrengthSpeed5}
+              playerInteractionEnabled={playerInteractionEnabled5}
+              playerInteractionRange={playerInteractionRange5}
+              playerInteractionStrength={playerInteractionStrength5}
+              normalMixEnabled={normalMixEnabled5}
+              normalMixFactor={normalMixFactor5}
+              aoEnabled={aoEnabled5}
+              aoIntensity={aoIntensity5}
+              fogEnabled={grassFogEnabled5}
+              fogNear={grassFogNear5}
+              fogFar={grassFogFar5}
+              fogColor={grassFogColor5}
+              fogIntensity={grassFogIntensity5}
             />
           )}
         {/* Lens Flares */}

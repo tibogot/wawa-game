@@ -3,8 +3,8 @@
 // Includes ALL original shaders with utility functions
 // Zero compilation errors, fully optimized React patterns
 
-import React, { useRef, useMemo, useEffect } from "react";
-import { useFrame } from "@react-three/fiber";
+import React, { useRef, useMemo, useEffect, useState } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 
 // ============================================================================
@@ -799,7 +799,7 @@ void main() {
 // GEOMETRY CREATION
 // ============================================================================
 
-function createGrassGeometry(segments, numGrass, patchSize) {
+function createGrassGeometry(segments, numGrass, patchSize, grassHeight) {
   const VERTICES = (segments + 1) * 2;
 
   // Create indices for double-sided grass blades
@@ -842,9 +842,22 @@ function createGrassGeometry(segments, numGrass, patchSize) {
     new THREE.InstancedBufferAttribute(offsetsFloat32, 3)
   );
   geo.setIndex(indices);
+
+  // Calculate proper bounding sphere radius
+  // Patch extends from -patchSize/2 to +patchSize/2 in X and Z
+  // Grass height extends from 0 to grassHeight in Y
+  // We need to calculate the distance from center (0,0,0) to the farthest corner
+  const halfPatchSize = patchSize / 2;
+  const diagonalDistance = Math.sqrt(
+    halfPatchSize * halfPatchSize + halfPatchSize * halfPatchSize
+  );
+  const radius = Math.sqrt(
+    diagonalDistance * diagonalDistance + grassHeight * grassHeight
+  );
+  // Add 10% safety margin to ensure all grass is included
   geo.boundingSphere = new THREE.Sphere(
-    new THREE.Vector3(0, 0, 0),
-    1 + patchSize * 2
+    new THREE.Vector3(0, grassHeight / 2, 0), // Center at half grass height
+    radius * 1.1
   );
 
   return geo;
@@ -867,7 +880,7 @@ export function GrassPatch({
   terrainHeight = 10, // Terrain height scale
   terrainOffset = 0, // Terrain offset
   terrainSize = 100, // Terrain dimensions for heightmap sampling
-  playerPosition = null, // Optional player position for interaction
+  playerPosition = null, // Optional player position for interaction and frustum culling
   castShadow = false, // Grass doesn't cast shadows (performance)
   receiveShadow = true, // Grass receives shadows
   fogEnabled = true, // Fog controls
@@ -906,6 +919,7 @@ export function GrassPatch({
   playerInteractionEnabled = true, // Player interaction controls
   playerInteractionRange = 2.5,
   playerInteractionStrength = 0.2,
+  meshRef: externalMeshRef = null, // Optional external ref for frustum culling control
 }) {
   const materialRef = useRef();
   const meshRef = useRef();
@@ -919,8 +933,8 @@ export function GrassPatch({
 
   // Create geometry once
   const geometry = useMemo(
-    () => createGrassGeometry(segments, numGrass, patchSize),
-    [segments, numGrass, patchSize]
+    () => createGrassGeometry(segments, numGrass, patchSize, grassHeight),
+    [segments, numGrass, patchSize, grassHeight]
   );
 
   // Create material once
@@ -1191,14 +1205,19 @@ export function GrassPatch({
     }
   });
 
+  // Use external ref if provided, otherwise use internal ref
+  const actualMeshRef = externalMeshRef || meshRef;
+
+  // Frustum culling is controlled by GrassField based on distance to player
+  // By default, enable frustum culling (Three.js will handle it efficiently)
   return (
     <mesh
-      ref={meshRef}
+      ref={actualMeshRef}
       position={position}
       geometry={geometry}
       castShadow={castShadow}
       receiveShadow={receiveShadow}
-      frustumCulled={false}
+      frustumCulled={true} // Enable Three.js frustum culling
     >
       <primitive ref={materialRef} object={material} attach="material" />
     </mesh>
@@ -1213,9 +1232,14 @@ export function GrassField({
   gridSize = 5, // Number of patches in each direction (5x5 = 25 patches)
   patchSpacing = 10, // Distance between patches
   centerPosition = [0, 0, 0], // Center of the field
+  playerPosition = null, // Optional player position for frustum culling optimization
   ...grassProps // Pass all GrassPatch props
 }) {
-  const patches = useMemo(() => {
+  const { camera } = useThree();
+
+  // Create all patches with useMemo (like GrassClaude4)
+  // The shader handles heightmap positioning, so we just use centerPosition Y
+  const allPatches = useMemo(() => {
     const result = [];
     const half = Math.floor(gridSize / 2);
 
@@ -1232,10 +1256,75 @@ export function GrassField({
     return result;
   }, [gridSize, patchSpacing, centerPosition]);
 
+  // Track which patches should skip frustum culling (close to player)
+  const patchRefsRef = useRef(new Map());
+  const CLOSE_DISTANCE = 30; // Within this distance, disable frustum culling
+
+  // Create refs for all patches
+  const patchRefs = useMemo(() => {
+    return allPatches.map(() => React.createRef());
+  }, [allPatches]);
+
+  // Store refs in map for frustum culling updates
+  useEffect(() => {
+    patchRefs.forEach((ref, index) => {
+      patchRefsRef.current.set(index, ref);
+    });
+  }, [patchRefs]);
+
+  // Update camera matrices and patch frustum culling each frame
+  useFrame(() => {
+    // Update camera matrices (critical for proper frustum culling)
+    camera.updateMatrixWorld(true);
+    camera.updateProjectionMatrix();
+
+    if (!playerPosition) {
+      // No player position - all patches use frustum culling
+      patchRefsRef.current.forEach((patchRef) => {
+        if (patchRef?.current) {
+          patchRef.current.frustumCulled = true;
+        }
+      });
+      return;
+    }
+
+    const playerPos =
+      playerPosition instanceof THREE.Vector3
+        ? playerPosition
+        : new THREE.Vector3(
+            playerPosition[0],
+            playerPosition[1],
+            playerPosition[2]
+          );
+
+    // Update frustum culling for each patch based on distance to player
+    allPatches.forEach((patchPos, index) => {
+      const patchX = patchPos[0];
+      const patchZ = patchPos[2];
+
+      const distance = Math.sqrt(
+        Math.pow(patchX - playerPos.x, 2) + Math.pow(patchZ - playerPos.z, 2)
+      );
+
+      const patchRef = patchRefsRef.current.get(index);
+      if (patchRef?.current) {
+        // Disable frustum culling for patches close to player
+        // Enable frustum culling for distant patches (Three.js will handle it)
+        patchRef.current.frustumCulled = distance > CLOSE_DISTANCE;
+      }
+    });
+  });
+
   return (
     <group>
-      {patches.map((pos, i) => (
-        <GrassPatch key={i} position={pos} {...grassProps} />
+      {allPatches.map((pos, i) => (
+        <GrassPatch
+          key={`${pos[0]}-${pos[2]}`}
+          meshRef={patchRefs[i]}
+          position={pos}
+          playerPosition={playerPosition}
+          {...grassProps}
+        />
       ))}
     </group>
   );
