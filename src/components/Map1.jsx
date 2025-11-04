@@ -104,6 +104,11 @@ export const Map1 = ({
     windDirectionSpeed,
     windStrengthScale,
     windStrengthSpeed,
+    playerInteractionEnabled,
+    playerInteractionRange,
+    playerInteractionStrength,
+    normalMixEnabled,
+    normalMixFactor,
     aoEnabled,
     aoIntensity,
     fogEnabled,
@@ -465,6 +470,11 @@ export const Map1 = ({
           windDirectionSpeed={windDirectionSpeed}
           windStrengthScale={windStrengthScale}
           windStrengthSpeed={windStrengthSpeed}
+          playerInteractionEnabled={playerInteractionEnabled}
+          playerInteractionRange={playerInteractionRange}
+          playerInteractionStrength={playerInteractionStrength}
+          normalMixEnabled={normalMixEnabled}
+          normalMixFactor={normalMixFactor}
           aoEnabled={aoEnabled}
           aoIntensity={aoIntensity}
           fogEnabled={fogEnabled}

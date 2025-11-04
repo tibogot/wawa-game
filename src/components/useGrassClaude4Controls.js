@@ -139,6 +139,24 @@ export function useGrassClaude4Controls() {
           { collapsed: true }
         ),
 
+        // Normal Mixing Controls
+        normalMixing: folder(
+          {
+            normalMixEnabled: {
+              value: true,
+              label: "Enable Normal Mixing",
+            },
+            normalMixFactor: {
+              value: 0.5,
+              min: 0,
+              max: 1,
+              step: 0.01,
+              label: "Normal Mix Factor",
+            },
+          },
+          { collapsed: true }
+        ),
+
         // Specular Controls
         specular: folder(
           {
@@ -237,6 +255,31 @@ export function useGrassClaude4Controls() {
               max: 5.0,
               step: 0.1,
               label: "Wind Strength Speed",
+            },
+          },
+          { collapsed: true }
+        ),
+
+        // Player Interaction Controls
+        playerInteraction: folder(
+          {
+            playerInteractionEnabled: {
+              value: true,
+              label: "Enable Player Interaction",
+            },
+            playerInteractionRange: {
+              value: 2.5,
+              min: 0.5,
+              max: 10.0,
+              step: 0.1,
+              label: "Interaction Range",
+            },
+            playerInteractionStrength: {
+              value: 0.2,
+              min: 0.0,
+              max: 1.0,
+              step: 0.05,
+              label: "Interaction Strength",
             },
           },
           { collapsed: true }

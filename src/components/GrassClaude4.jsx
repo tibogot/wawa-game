@@ -262,6 +262,11 @@ uniform float uWindDirectionSpeed;
 uniform float uWindStrengthScale;
 uniform float uWindStrengthSpeed;
 
+// Player interaction uniforms
+uniform bool uPlayerInteractionEnabled;
+uniform float uPlayerInteractionRange;
+uniform float uPlayerInteractionStrength;
+
 attribute float vertIndex;
 
 // Utility functions
@@ -402,11 +407,15 @@ void main() {
   }
 
   // Player interaction
-  float distToPlayer = distance(grassBladeWorldPos.xz, playerPos.xz);
-  float playerFalloff = smoothstep(2.5, 1.0, distToPlayer);
-  float playerLeanAngle = mix(0.0, 0.2, playerFalloff * linearstep(0.5, 0.0, windLeanAngle));
-  vec3 grassToPlayer = normalize(vec3(playerPos.x, 0.0, playerPos.z) - vec3(grassBladeWorldPos.x, 0.0, grassBladeWorldPos.z));
-  vec3 playerLeanAxis = vec3(grassToPlayer.z, 0, -grassToPlayer.x);
+  float playerLeanAngle = 0.0;
+  vec3 playerLeanAxis = vec3(1.0, 0.0, 0.0);
+  if (uPlayerInteractionEnabled) {
+    float distToPlayer = distance(grassBladeWorldPos.xz, playerPos.xz);
+    float playerFalloff = smoothstep(uPlayerInteractionRange, 1.0, distToPlayer);
+    playerLeanAngle = mix(0.0, uPlayerInteractionStrength, playerFalloff * linearstep(0.5, 0.0, windLeanAngle));
+    vec3 grassToPlayer = normalize(vec3(playerPos.x, 0.0, playerPos.z) - vec3(grassBladeWorldPos.x, 0.0, grassBladeWorldPos.z));
+    playerLeanAxis = vec3(grassToPlayer.z, 0, -grassToPlayer.x);
+  }
 
   randomLean += leanAnimation;
 
@@ -585,6 +594,10 @@ uniform float uSpecularPower;
 uniform float uSpecularScale;
 uniform vec3 uLightDirection;
 
+// Normal mixing uniforms
+uniform bool uNormalMixEnabled;
+uniform float uNormalMixFactor;
+
 // Advanced uniforms
 uniform bool uAoEnabled;
 uniform float uAoIntensity;
@@ -685,7 +698,8 @@ void main() {
   // normal is already provided by Three.js after normal_fragment_maps
   vec3 baseNormal = normalize(normal);
   vec3 normal2 = normalize(vNormal2);
-  normal = normalize(mix(baseNormal, normal2, vGrassParams.w));
+  float mixFactor = uNormalMixEnabled ? uNormalMixFactor : vGrassParams.w;
+  normal = normalize(mix(baseNormal, normal2, mixFactor));
   
   #include <emissivemap_fragment>
   
@@ -878,6 +892,8 @@ export function GrassPatch({
   lightDirectionX = 1.0,
   lightDirectionY = 1.0,
   lightDirectionZ = 0.5,
+  normalMixEnabled = true, // Normal mixing controls
+  normalMixFactor = 0.5,
   aoEnabled = true, // Advanced controls
   aoIntensity = 1.0,
   windEnabled = true, // Wind controls
@@ -886,6 +902,9 @@ export function GrassPatch({
   windDirectionSpeed = 0.05,
   windStrengthScale = 0.25,
   windStrengthSpeed = 1.0,
+  playerInteractionEnabled = true, // Player interaction controls
+  playerInteractionRange = 2.5,
+  playerInteractionStrength = 0.2,
 }) {
   const materialRef = useRef();
   const meshRef = useRef();
@@ -969,6 +988,21 @@ export function GrassPatch({
       shader.uniforms.uWindStrengthScale = { value: windStrengthScale };
       shader.uniforms.uWindStrengthSpeed = { value: windStrengthSpeed };
 
+      // Player interaction uniforms
+      shader.uniforms.uPlayerInteractionEnabled = {
+        value: playerInteractionEnabled,
+      };
+      shader.uniforms.uPlayerInteractionRange = {
+        value: playerInteractionRange,
+      };
+      shader.uniforms.uPlayerInteractionStrength = {
+        value: playerInteractionStrength,
+      };
+
+      // Normal mixing uniforms
+      shader.uniforms.uNormalMixEnabled = { value: normalMixEnabled };
+      shader.uniforms.uNormalMixFactor = { value: normalMixFactor };
+
       // Backscatter/SSS uniforms
       shader.uniforms.uBackscatterEnabled = { value: backscatterEnabled };
       shader.uniforms.uBackscatterIntensity = { value: backscatterIntensity };
@@ -1051,6 +1085,11 @@ export function GrassPatch({
     windDirectionSpeed,
     windStrengthScale,
     windStrengthSpeed,
+    playerInteractionEnabled,
+    playerInteractionRange,
+    playerInteractionStrength,
+    normalMixEnabled,
+    normalMixFactor,
   ]);
 
   // Cleanup geometry
@@ -1113,6 +1152,17 @@ export function GrassPatch({
       shader.uniforms.uWindDirectionSpeed.value = windDirectionSpeed;
       shader.uniforms.uWindStrengthScale.value = windStrengthScale;
       shader.uniforms.uWindStrengthSpeed.value = windStrengthSpeed;
+
+      // Update player interaction uniforms
+      shader.uniforms.uPlayerInteractionEnabled.value =
+        playerInteractionEnabled;
+      shader.uniforms.uPlayerInteractionRange.value = playerInteractionRange;
+      shader.uniforms.uPlayerInteractionStrength.value =
+        playerInteractionStrength;
+
+      // Update normal mixing uniforms
+      shader.uniforms.uNormalMixEnabled.value = normalMixEnabled;
+      shader.uniforms.uNormalMixFactor.value = normalMixFactor;
 
       // Update backscatter/SSS uniforms
       shader.uniforms.uBackscatterEnabled.value = backscatterEnabled;
