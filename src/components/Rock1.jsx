@@ -22,7 +22,7 @@ export function Rock1({
   // Clone the scene to avoid modifying the original
   const clonedScene = useMemo(() => scene.clone(), [scene]);
 
-  // Apply shadows to all meshes in the scene
+  // Apply shadows to all meshes in the scene and darken materials
   useEffect(() => {
     if (clonedScene) {
       clonedScene.traverse((child) => {
@@ -30,16 +30,24 @@ export function Rock1({
           child.castShadow = true;
           child.receiveShadow = true;
 
-          // Ensure materials are properly configured
+          // Ensure materials are properly configured and darken them
           if (child.material) {
             if (Array.isArray(child.material)) {
               child.material.forEach((material) => {
                 if (material instanceof THREE.Material) {
                   material.needsUpdate = true;
+                  // Darken the material color
+                  if (material.color) {
+                    material.color.multiplyScalar(0.75); // Darken by 25%
+                  }
                 }
               });
             } else if (child.material instanceof THREE.Material) {
               child.material.needsUpdate = true;
+              // Darken the material color
+              if (child.material.color) {
+                child.material.color.multiplyScalar(0.75); // Darken by 25%
+              }
             }
           }
         }

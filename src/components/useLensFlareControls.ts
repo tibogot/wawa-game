@@ -9,7 +9,7 @@ export const useLensFlareControls = () => {
         label: "Enable Lens Flares",
       },
       lensFlare1Enabled: {
-        value: true,
+        value: false,
         label: "Light 1 (Yellow)",
       },
       lensFlare1Position: {
@@ -46,7 +46,7 @@ export const useLensFlareControls = () => {
         label: "Light 1 Intensity",
       },
       lensFlare2Enabled: {
-        value: true,
+        value: false,
         label: "Light 2 (Cyan)",
       },
       lensFlare2Position: {
@@ -87,7 +87,7 @@ export const useLensFlareControls = () => {
         label: "Light 3 (Magenta)",
       },
       lensFlare3Position: {
-        value: { x: 0, y: 50, z: -70 },
+        value: { x: 1500, y: 200, z: 1000 },
         label: "Light 3 Position",
         step: 1,
       },

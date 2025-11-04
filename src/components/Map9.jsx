@@ -24,6 +24,7 @@ import { useMovingShadowPlanesControls } from "./useMovingShadowPlanesControls";
 import { FloorDebugSpheres } from "./FloorDebugSpheres";
 import { useFloorDebugSpheresControls } from "./useFloorDebugSpheresControls";
 import { FloatingLeaves } from "./FloatingLeaves";
+import { FloatingLeaves2 } from "./FloatingLeaves2";
 import { ButterflyParticles } from "./ButterflyParticles";
 import { useButterflyParticlesControls } from "./useButterflyParticlesControls";
 import { Mountain } from "./Mountain";
@@ -714,6 +715,13 @@ export const Map9 = forwardRef(
         {/* Floating Leaves */}
         {heightmapLookup && (
           <FloatingLeaves getTerrainHeight={getGroundHeight} />
+        )}
+        {/* Floating Leaves 2 - Tornado animation around character */}
+        {heightmapLookup && (
+          <FloatingLeaves2
+            characterPosition={characterPosition || fallbackPosition}
+            getTerrainHeight={getGroundHeight}
+          />
         )}
         {/* Butterfly Particles */}
         {butterflyEnabled && butterflyTexture !== "both" && heightmapLookup && (
