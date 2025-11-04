@@ -360,7 +360,8 @@ void main() {
   vec4 hashVal1 = hash42(vec2(grassBladeWorldPos.x, grassBladeWorldPos.z));
 
   float highLODOut = smoothstep(grassDraw.x * 0.5, grassDraw.x, distance(cameraPosition, grassBladeWorldPos));
-  float lodFadeIn = smoothstep(grassDraw.x, grassDraw.y, distance(cameraPosition, grassBladeWorldPos));
+  // Disable distance-based culling - always show grass regardless of distance
+  float lodFadeIn = 0.0; // smoothstep(grassDraw.x, grassDraw.y, distance(cameraPosition, grassBladeWorldPos));
 
   // Check terrain type
   float isSandy = linearstep(-11.0, -14.0, grassBladeWorldPos.y);
@@ -1197,6 +1198,7 @@ export function GrassPatch({
       geometry={geometry}
       castShadow={castShadow}
       receiveShadow={receiveShadow}
+      frustumCulled={false}
     >
       <primitive ref={materialRef} object={material} attach="material" />
     </mesh>

@@ -7,9 +7,11 @@ import { ProceduralTerrain8 } from "./ProceduralTerrain8";
 import { SimonDevGrass21 } from "./SimonDevGrass21/SimonDevGrass21";
 import { SimonDevGrass22 } from "./SimonDevGrass22/SimonDevGrass22";
 import { SimonDevGrass23 } from "./SimonDevGrass23/SimonDevGrass23";
+import { GrassField as GrassField4 } from "./GrassClaude4";
 import { useSimonDevGrass21Controls } from "./useSimonDevGrass21Controls";
 import { useSimonDevGrass22Controls } from "./useSimonDevGrass22Controls";
 import { useSimonDevGrass23Controls } from "./useSimonDevGrass23Controls";
+import { useGrassClaude4Controls } from "./useGrassClaude4Controls";
 import { HeightFog } from "./HeightFog";
 import { useHeightFogControls } from "./useHeightFogControls";
 import { CloudSystem } from "./CloudSystem";
@@ -69,6 +71,55 @@ export const Map9 = forwardRef(
     const { simonDevGrass22Enabled } = useSimonDevGrass22Controls();
     // Get SimonDevGrass23 controls
     const { simonDevGrass23Enabled } = useSimonDevGrass23Controls();
+    // Get GrassClaude4 controls
+    const {
+      grassClaude4Enabled,
+      grassHeight,
+      gridSize: grassGridSize,
+      patchSpacing,
+      segments: grassSegments,
+      numGrass,
+      patchSize,
+      grassWidth,
+      lodDistance,
+      maxDistance,
+      baseColor1,
+      baseColor2,
+      tipColor1,
+      tipColor2,
+      backscatterEnabled,
+      backscatterIntensity,
+      backscatterColor,
+      backscatterPower,
+      frontScatterStrength,
+      rimSSSStrength,
+      specularEnabled,
+      specularIntensity,
+      specularColor,
+      specularPower,
+      specularScale,
+      lightDirectionX,
+      lightDirectionY,
+      lightDirectionZ,
+      windEnabled,
+      windStrength,
+      windDirectionScale,
+      windDirectionSpeed,
+      windStrengthScale,
+      windStrengthSpeed,
+      playerInteractionEnabled,
+      playerInteractionRange,
+      playerInteractionStrength,
+      normalMixEnabled,
+      normalMixFactor,
+      aoEnabled,
+      aoIntensity,
+      fogEnabled: grassFogEnabled,
+      fogNear: grassFogNear,
+      fogFar: grassFogFar,
+      fogColor: grassFogColor,
+      fogIntensity: grassFogIntensity,
+    } = useGrassClaude4Controls();
 
     // Get Height Fog controls from hook
     const { heightFogEnabled, fogColor, fogHeight, fogNear, fogFar } =
@@ -302,6 +353,139 @@ export const Map9 = forwardRef(
       [heightmapLookup]
     );
 
+    // Generate heightmap texture from getGroundHeight for GrassClaude4
+    // GrassClaude4 uses shader-based heightmap sampling, so we need a texture
+    const { heightmapTexture, terrainHeight, terrainOffset } = useMemo(() => {
+      if (!heightmapLookup || !isTerrainMeshReady) {
+        return { heightmapTexture: null, terrainHeight: 0, terrainOffset: 0 };
+      }
+
+      // Terrain size - should match ProceduralTerrain8 size
+      // Using 2500 as default based on other grass systems in Map9
+      const terrainSize = 2500;
+      const textureSize = 1024; // Resolution of heightmap texture (higher = more accurate but slower)
+      // 1024x1024 gives ~2.4 units per pixel for 2500 unit terrain (good balance of quality and performance)
+
+      // Sample terrain at regular intervals
+      // IMPORTANT: The shader inverts Z coordinate (remaps to 1.0, 0.0 instead of 0.0, 1.0)
+      // So we need to flip the texture Y coordinate to match
+      // Texture UV: (0,0) maps to world (-terrainSize/2, terrainSize/2)
+      // Texture UV: (1,1) maps to world (terrainSize/2, -terrainSize/2)
+      const data = new Float32Array(textureSize * textureSize);
+      let minHeight = Infinity;
+      let maxHeight = -Infinity;
+
+      // First pass: sample heights and find min/max
+      for (let y = 0; y < textureSize; y++) {
+        for (let x = 0; x < textureSize; x++) {
+          // Convert texture coordinates to world coordinates
+          // Note: texture Y is inverted to match shader's Z inversion
+          const worldX = (x / textureSize) * terrainSize - terrainSize / 2;
+          // Flip Y: texture Y=0 should map to world Z=+terrainSize/2 (top of texture = positive Z)
+          const worldZ =
+            ((textureSize - 1 - y) / textureSize) * terrainSize -
+            terrainSize / 2;
+          const height = heightmapLookup(worldX, worldZ);
+
+          // Store in data array (row-major order: y * textureSize + x)
+          const index = y * textureSize + x;
+          data[index] = height;
+          minHeight = Math.min(minHeight, height);
+          maxHeight = Math.max(maxHeight, height);
+        }
+      }
+
+      // Second pass: normalize heights to 0-1 range
+      const heightRange = maxHeight - minHeight;
+      for (let i = 0; i < data.length; i++) {
+        const normalizedHeight =
+          heightRange > 0 ? (data[i] - minHeight) / heightRange : 0.5;
+        data[i] = normalizedHeight;
+      }
+
+      // Create DataTexture (single channel, red channel will be used)
+      const texture = new THREE.DataTexture(
+        data,
+        textureSize,
+        textureSize,
+        THREE.RedFormat,
+        THREE.FloatType
+      );
+      texture.needsUpdate = true;
+      texture.wrapS = THREE.ClampToEdgeWrapping;
+      texture.wrapT = THREE.ClampToEdgeWrapping;
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+
+      // The shader calculates: grassBladeWorldPos.y += heightmapSample.x * terrainHeight - terrainOffset
+      // Where heightmapSample.x is normalized (0-1), representing (originalHeight - minHeight) / heightRange
+      // To recover: originalHeight = heightmapSample.x * heightRange + minHeight
+      // We want the shader to add originalHeight, so:
+      // terrainHeight = heightRange (to scale from 0-1 back to actual range)
+      // terrainOffset = minHeight (to offset from 0 to actual minimum)
+      // But wait, the shader does: Y += textureValue * terrainHeight - terrainOffset
+      // So: Y += textureValue * heightRange - minHeight
+      // Which gives: Y += (originalHeight - minHeight) / heightRange * heightRange - minHeight
+      // = Y += originalHeight - minHeight - minHeight = Y += originalHeight - 2*minHeight (WRONG!)
+      //
+      // Actually, we want: Y += originalHeight
+      // So: textureValue * terrainHeight - terrainOffset = originalHeight
+      // = ((originalHeight - minHeight) / heightRange) * terrainHeight - terrainOffset = originalHeight
+      // = ((originalHeight - minHeight) / heightRange) * terrainHeight = originalHeight + terrainOffset
+      // = (originalHeight - minHeight) * terrainHeight / heightRange = originalHeight + terrainOffset
+      //
+      // If terrainHeight = heightRange and terrainOffset = -minHeight:
+      // = (originalHeight - minHeight) * heightRange / heightRange = originalHeight - minHeight
+      // = originalHeight - minHeight = originalHeight - minHeight ✓
+      // Wait, that's still wrong...
+      //
+      // Let me think again. We want: Y += originalHeight
+      // textureValue = (originalHeight - minHeight) / heightRange
+      // Shader does: Y += textureValue * terrainHeight - terrainOffset
+      // We want: textureValue * terrainHeight - terrainOffset = originalHeight
+      // So: ((originalHeight - minHeight) / heightRange) * terrainHeight - terrainOffset = originalHeight
+      // = (originalHeight - minHeight) * terrainHeight / heightRange - terrainOffset = originalHeight
+      // = (originalHeight - minHeight) * terrainHeight / heightRange = originalHeight + terrainOffset
+      //
+      // If terrainHeight = heightRange and terrainOffset = -minHeight:
+      // = (originalHeight - minHeight) * heightRange / heightRange = originalHeight - minHeight
+      // = originalHeight - minHeight = originalHeight - minHeight ✓
+      // But we want originalHeight, not originalHeight - minHeight!
+      //
+      // So we need: terrainOffset = 0 and terrainHeight = heightRange, then:
+      // = (originalHeight - minHeight) * heightRange / heightRange = originalHeight - minHeight
+      // But we want originalHeight, so we need to add minHeight back:
+      // terrainOffset = minHeight (positive offset)
+      // Wait, that's still not right...
+      //
+      // Actually, let me re-read the shader code:
+      // grassBladeWorldPos.y += heightmapSample.x * grassParams.z - grassParams.w;
+      // Where grassParams.z = terrainHeight, grassParams.w = terrainOffset
+      // So: Y += textureValue * terrainHeight - terrainOffset
+      //
+      // We want: Y += originalHeight
+      // textureValue = (originalHeight - minHeight) / heightRange
+      // So: ((originalHeight - minHeight) / heightRange) * terrainHeight - terrainOffset = originalHeight
+      // = (originalHeight - minHeight) * terrainHeight / heightRange - terrainOffset = originalHeight
+      // = (originalHeight - minHeight) * terrainHeight / heightRange = originalHeight + terrainOffset
+      //
+      // If terrainHeight = heightRange:
+      // = (originalHeight - minHeight) - terrainOffset = originalHeight
+      // = originalHeight - minHeight - terrainOffset = originalHeight
+      // = -minHeight - terrainOffset = 0
+      // = terrainOffset = -minHeight
+      //
+      // So: Y += ((originalHeight - minHeight) / heightRange) * heightRange - (-minHeight)
+      // = Y += (originalHeight - minHeight) + minHeight
+      // = Y += originalHeight ✓ CORRECT!
+
+      return {
+        heightmapTexture: texture,
+        terrainHeight: heightRange > 0 ? heightRange : 100,
+        terrainOffset: minHeight !== Infinity ? -minHeight : 0,
+      };
+    }, [heightmapLookup, isTerrainMeshReady]);
+
     // Calculate terrain height for WindFlag position
     // WindFlag positions pole center at poleHeight/2 above group position
     // So we need to place group at terrainHeight - poleHeight/2 to get pole base at terrainHeight
@@ -374,6 +558,66 @@ export const Map9 = forwardRef(
             characterPosition={characterPosition || fallbackPosition}
           />
         )}
+
+        {/* GrassClaude4 Grass System - Only render when terrain is fully ready */}
+        {grassClaude4Enabled &&
+          isTerrainMeshReady &&
+          heightmapLookup &&
+          heightmapTexture && (
+            <GrassField4
+              gridSize={grassGridSize}
+              patchSpacing={patchSpacing}
+              centerPosition={[0, 0, 0]}
+              playerPosition={characterPosition || fallbackPosition}
+              segments={grassSegments}
+              numGrass={numGrass}
+              patchSize={patchSize}
+              grassWidth={grassWidth}
+              grassHeight={grassHeight}
+              lodDistance={lodDistance}
+              maxDistance={maxDistance}
+              heightmap={heightmapTexture}
+              terrainSize={2500}
+              terrainHeight={terrainHeight}
+              terrainOffset={terrainOffset}
+              baseColor1={baseColor1}
+              baseColor2={baseColor2}
+              tipColor1={tipColor1}
+              tipColor2={tipColor2}
+              backscatterEnabled={backscatterEnabled}
+              backscatterIntensity={backscatterIntensity}
+              backscatterColor={backscatterColor}
+              backscatterPower={backscatterPower}
+              frontScatterStrength={frontScatterStrength}
+              rimSSSStrength={rimSSSStrength}
+              specularEnabled={specularEnabled}
+              specularIntensity={specularIntensity}
+              specularColor={specularColor}
+              specularPower={specularPower}
+              specularScale={specularScale}
+              lightDirectionX={lightDirectionX}
+              lightDirectionY={lightDirectionY}
+              lightDirectionZ={lightDirectionZ}
+              windEnabled={windEnabled}
+              windStrength={windStrength}
+              windDirectionScale={windDirectionScale}
+              windDirectionSpeed={windDirectionSpeed}
+              windStrengthScale={windStrengthScale}
+              windStrengthSpeed={windStrengthSpeed}
+              playerInteractionEnabled={playerInteractionEnabled}
+              playerInteractionRange={playerInteractionRange}
+              playerInteractionStrength={playerInteractionStrength}
+              normalMixEnabled={normalMixEnabled}
+              normalMixFactor={normalMixFactor}
+              aoEnabled={aoEnabled}
+              aoIntensity={aoIntensity}
+              fogEnabled={grassFogEnabled}
+              fogNear={grassFogNear}
+              fogFar={grassFogFar}
+              fogColor={grassFogColor}
+              fogIntensity={grassFogIntensity}
+            />
+          )}
         {/* Lens Flares */}
         {lensFlareEnabled && (
           <>
