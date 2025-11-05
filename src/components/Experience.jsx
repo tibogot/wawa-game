@@ -21,6 +21,8 @@ import { Map9 } from "./Map9";
 import { Map10 } from "./Map10";
 import { Map11 } from "./Map11";
 import { Map12 } from "./Map12";
+import { Map13 } from "./Map13";
+import { Map14 } from "./Map14";
 import { DeerController } from "./DeerController";
 import { DeerHerd } from "./DeerHerd";
 import { useLightsControls } from "./useLightsControls";
@@ -76,6 +78,14 @@ const maps = {
     position: [0, 0, 0],
   },
   map12: {
+    scale: 1,
+    position: [0, 0, 0],
+  },
+  map13: {
+    scale: 1,
+    position: [0, 0, 0],
+  },
+  map14: {
     scale: 1,
     position: [0, 0, 0],
   },
@@ -150,9 +160,12 @@ export const Experience = () => {
     showTestSphere,
   } = useLightsControls();
 
-  // Override directional position for Map9 - memoized for stable reference
+  // Override directional position for Map9 and Map13 - memoized for stable reference
   const directionalPosition = useMemo(
-    () => (map === "map9" ? [-15, 80, 15] : defaultDirectionalPosition),
+    () =>
+      map === "map9" || map === "map13"
+        ? [-15, 80, 15]
+        : defaultDirectionalPosition,
     [map, defaultDirectionalPosition]
   );
 
@@ -188,15 +201,21 @@ export const Experience = () => {
       return; // Exit early if map hasn't changed
     }
 
-    // For Map5, Map8, Map9, Map10, Map11, and Map12, wait for terrain callback. For others, mark ready immediately
+    // For Map5, Map8, Map9, Map10, Map11, Map12, and Map13, wait for terrain callback. For others, mark ready immediately
     if (
       map !== "map5" &&
       map !== "map8" &&
       map !== "map9" &&
       map !== "map10" &&
       map !== "map11" &&
-      map !== "map12"
+      map !== "map12" &&
+      map !== "map13"
     ) {
+      setIsTerrainReady(true);
+    }
+
+    // Map14 is a simple GLB model, mark ready immediately
+    if (map === "map14") {
       setIsTerrainReady(true);
     }
 
@@ -274,6 +293,20 @@ export const Experience = () => {
       // For Map12 (ProceduralTerrain5), spawn higher to give terrain time to initialize
       const characterPos = [0, 50, 0];
       const deerPos = [5, 50, 5];
+
+      setCharacterSpawnPosition(characterPos);
+      setDeerSpawnPosition(deerPos);
+    } else if (map === "map13") {
+      // For Map13 (ProceduralTerrain9), spawn higher to give terrain time to initialize
+      const characterPos = [0, 50, 0];
+      const deerPos = [5, 50, 5];
+
+      setCharacterSpawnPosition(characterPos);
+      setDeerSpawnPosition(deerPos);
+    } else if (map === "map14") {
+      // For Map14 (Simpleterrainblender), spawn above terrain
+      const characterPos = [0, 5, 0];
+      const deerPos = [5, 5, 5];
 
       setCharacterSpawnPosition(characterPos);
       setDeerSpawnPosition(deerPos);
@@ -472,8 +505,24 @@ export const Experience = () => {
             characterVelocity={characterVelocity.current}
             onTerrainReady={handleTerrainReady}
           />
-        ) : (
+        ) : map === "map12" ? (
           <Map12
+            ref={terrainMeshRef}
+            scale={maps[map].scale}
+            position={maps[map].position}
+            characterPosition={characterPositionVector.current}
+            characterVelocity={characterVelocity.current}
+            onTerrainReady={handleTerrainReady}
+          />
+        ) : map === "map13" ? (
+          <Map13
+            ref={terrainMeshRef}
+            scale={maps[map].scale}
+            position={maps[map].position}
+            onTerrainReady={handleTerrainReady}
+          />
+        ) : (
+          <Map14
             ref={terrainMeshRef}
             scale={maps[map].scale}
             position={maps[map].position}

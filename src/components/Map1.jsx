@@ -27,6 +27,8 @@ import LensFlare from "./LensFlare";
 import { FlowingLinesSimple } from "./FlowingLinesSimple";
 import { WindFlag } from "./WindFlag";
 import { useWindFlagControls } from "./useWindFlagControls";
+import { AdBillboard } from "./AdBillboard";
+import { useAdBillboardControls } from "./useAdBillboardControls";
 import { RipplePlane } from "./RipplePlane";
 import { FloatingLeaves2 } from "./FloatingLeaves2";
 import { FloatingLeaves } from "./FloatingLeaves";
@@ -414,6 +416,23 @@ export const Map1 = ({
     windFlagWaveIntensity,
   } = useWindFlagControls();
 
+  // AdBillboard controls
+  const {
+    adBillboardEnabled,
+    adBillboardPosition,
+    adBillboardYOffset,
+    adBillboardScale,
+    adBillboardColor,
+    adBillboardPylonHeight,
+    adBillboardWidth,
+    adBillboardHeight,
+    adBillboardPylonSpacing,
+    adBillboardPylonRadius,
+    adBillboardUseTexture,
+    adBillboardTexturePath,
+    adBillboardTextureQuality,
+  } = useAdBillboardControls();
+
   return (
     <group ref={group} {...props}>
       {skyboxEnabled && <Skybox />}
@@ -451,6 +470,27 @@ export const Map1 = ({
           texturePath={windFlagTexturePath}
           textureQuality={windFlagTextureQuality}
           waveIntensity={windFlagWaveIntensity}
+        />
+      )}
+
+      {/* AdBillboard - Rigid billboard with two pylons */}
+      {adBillboardEnabled && (
+        <AdBillboard
+          position={[
+            adBillboardPosition[0],
+            -adBillboardPylonHeight / 2 + adBillboardYOffset,
+            adBillboardPosition[1],
+          ]}
+          scale={adBillboardScale}
+          billboardColor={adBillboardColor}
+          pylonHeight={adBillboardPylonHeight}
+          billboardWidth={adBillboardWidth}
+          billboardHeight={adBillboardHeight}
+          pylonSpacing={adBillboardPylonSpacing}
+          pylonRadius={adBillboardPylonRadius}
+          useTexture={adBillboardUseTexture}
+          texturePath={adBillboardTexturePath}
+          textureQuality={adBillboardTextureQuality}
         />
       )}
       {/* Dynamic Leaves v3 */}

@@ -37,6 +37,8 @@ import { Rock1 } from "./Rock1";
 import { useRock1Controls } from "./useRock1Controls";
 import { WindFlag } from "./WindFlag";
 import { useWindFlagControls } from "./useWindFlagControls";
+import { AdBillboard } from "./AdBillboard";
+import { useAdBillboardControls } from "./useAdBillboardControls";
 import { DustParticles } from "./DustParticles";
 import { useDustParticlesControls } from "./useDustParticlesControls";
 import { DynamicLeaves as DynamicLeaves3 } from "./DynamicLeaves3";
@@ -301,6 +303,23 @@ export const Map9 = forwardRef(
       windFlagWaveIntensity,
       windFlagYOffset,
     } = useWindFlagControls();
+
+    // Get AdBillboard controls
+    const {
+      adBillboardEnabled,
+      adBillboardPosition,
+      adBillboardYOffset,
+      adBillboardScale,
+      adBillboardColor,
+      adBillboardPylonHeight,
+      adBillboardWidth,
+      adBillboardHeight,
+      adBillboardPylonSpacing,
+      adBillboardPylonRadius,
+      adBillboardUseTexture,
+      adBillboardTexturePath,
+      adBillboardTextureQuality,
+    } = useAdBillboardControls();
 
     // Get DustParticles controls
     const {
@@ -623,6 +642,24 @@ export const Map9 = forwardRef(
     if (windFlagEnabled && heightmapLookup) {
       console.log(
         `Map9 - WindFlag at [${windFlagPosition[0]}, ${windFlagPosition[2]}] -> terrain height: ${windFlagTerrainHeight}`
+      );
+    }
+
+    // Calculate terrain height for AdBillboard position
+    // AdBillboard positions pylon center at pylonHeight/2 above group position
+    // So we need to place group at terrainHeight - pylonHeight/2 to get pylon base at terrainHeight
+    // Add user-adjustable Y offset
+    const adBillboardTerrainHeight =
+      adBillboardEnabled && heightmapLookup
+        ? getGroundHeight(adBillboardPosition[0], adBillboardPosition[2]) -
+          adBillboardPylonHeight / 2 +
+          adBillboardYOffset
+        : 0;
+
+    // Debug: Log the calculated height
+    if (adBillboardEnabled && heightmapLookup) {
+      console.log(
+        `Map9 - AdBillboard at [${adBillboardPosition[0]}, ${adBillboardPosition[2]}] -> terrain height: ${adBillboardTerrainHeight}`
       );
     }
 
@@ -1006,6 +1043,26 @@ export const Map9 = forwardRef(
             texturePath={windFlagTexturePath}
             textureQuality={windFlagTextureQuality}
             waveIntensity={windFlagWaveIntensity}
+          />
+        )}
+        {/* AdBillboard - Rigid billboard with two pylons */}
+        {adBillboardEnabled && heightmapLookup && (
+          <AdBillboard
+            position={[
+              adBillboardPosition[0],
+              adBillboardTerrainHeight,
+              adBillboardPosition[2],
+            ]}
+            scale={adBillboardScale}
+            billboardColor={adBillboardColor}
+            pylonHeight={adBillboardPylonHeight}
+            billboardWidth={adBillboardWidth}
+            billboardHeight={adBillboardHeight}
+            pylonSpacing={adBillboardPylonSpacing}
+            pylonRadius={adBillboardPylonRadius}
+            useTexture={adBillboardUseTexture}
+            texturePath={adBillboardTexturePath}
+            textureQuality={adBillboardTextureQuality}
           />
         )}
         {/* Mountain */}
