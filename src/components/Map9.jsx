@@ -50,6 +50,8 @@ import { ImpostorForest } from "./ImpostorForest";
 import { useImpostorForestControls } from "./useImpostorForestControls";
 import { InstancedTrees } from "./InstancedTrees";
 import { useInstancedTreesControls } from "./useInstancedTreesControls";
+import { InstancedPines } from "./InstancedPines";
+import { useInstancedPinesControls } from "./useInstancedPinesControls";
 // import { Lake } from "./Lake";
 
 export const Map9 = forwardRef(
@@ -377,6 +379,38 @@ export const Map9 = forwardRef(
       viewThickenPower,
       viewThickenStrength,
     } = useInstancedTreesControls();
+
+    // Get InstancedPines controls
+    const {
+      instancedPinesEnabled,
+      instancedPineCount,
+      instancedPinePositionX,
+      instancedPinePositionY,
+      instancedPinePositionZ,
+      instancedPineRadius,
+      instancedPineMinRadius,
+      pineScaleRangeMin,
+      pineScaleRangeMax,
+      pineCastShadow,
+      pineReceiveShadow,
+      pineEnableTransparentSorting,
+      pineEnableBVH,
+      pineBvhMargin,
+      pineEnableViewThickening,
+      pineViewThickenPower,
+      pineViewThickenStrength,
+      pineAoEnabled,
+      pineAoIntensity,
+      pineBackscatterEnabled,
+      pineBackscatterIntensity,
+      pineBackscatterColor,
+      pineBackscatterPower,
+      pineFrontScatterStrength,
+      pineRimSSSStrength,
+      pineLightDirectionX,
+      pineLightDirectionY,
+      pineLightDirectionZ,
+    } = useInstancedPinesControls();
 
     // Create stable fallback vectors
     const fallbackPosition = useMemo(() => new THREE.Vector3(0, 0, 0), []);
@@ -1023,6 +1057,42 @@ export const Map9 = forwardRef(
             enableViewThickening={enableViewThickening}
             viewThickenPower={viewThickenPower}
             viewThickenStrength={viewThickenStrength}
+          />
+        )}
+
+        {/* Instanced Pines - Using InstancedMesh2 */}
+        {instancedPinesEnabled && heightmapLookup && (
+          <InstancedPines
+            count={instancedPineCount}
+            position={[
+              instancedPinePositionX,
+              instancedPinePositionY,
+              instancedPinePositionZ,
+            ]}
+            radius={instancedPineRadius}
+            minRadius={instancedPineMinRadius}
+            scaleRange={[pineScaleRangeMin, pineScaleRangeMax]}
+            enabled={instancedPinesEnabled}
+            getTerrainHeight={getGroundHeight}
+            enableBVH={pineEnableBVH}
+            bvhMargin={pineBvhMargin}
+            castShadow={pineCastShadow}
+            receiveShadow={pineReceiveShadow}
+            enableTransparentSorting={pineEnableTransparentSorting}
+            enableViewThickening={pineEnableViewThickening}
+            viewThickenPower={pineViewThickenPower}
+            viewThickenStrength={pineViewThickenStrength}
+            aoEnabled={pineAoEnabled}
+            aoIntensity={pineAoIntensity}
+            backscatterEnabled={pineBackscatterEnabled}
+            backscatterIntensity={pineBackscatterIntensity}
+            backscatterColor={pineBackscatterColor}
+            backscatterPower={pineBackscatterPower}
+            frontScatterStrength={pineFrontScatterStrength}
+            rimSSSStrength={pineRimSSSStrength}
+            lightDirectionX={pineLightDirectionX}
+            lightDirectionY={pineLightDirectionY}
+            lightDirectionZ={pineLightDirectionZ}
           />
         )}
 

@@ -201,6 +201,17 @@ export const Map1 = ({
     pineEnableViewThickening,
     pineViewThickenPower,
     pineViewThickenStrength,
+    pineAoEnabled,
+    pineAoIntensity,
+    pineBackscatterEnabled,
+    pineBackscatterIntensity,
+    pineBackscatterColor,
+    pineBackscatterPower,
+    pineFrontScatterStrength,
+    pineRimSSSStrength,
+    pineLightDirectionX,
+    pineLightDirectionY,
+    pineLightDirectionZ,
   } = useInstancedPinesControls();
 
   // Get LensFlare controls
@@ -715,6 +726,17 @@ export const Map1 = ({
           enableViewThickening={pineEnableViewThickening}
           viewThickenPower={pineViewThickenPower}
           viewThickenStrength={pineViewThickenStrength}
+          aoEnabled={pineAoEnabled}
+          aoIntensity={pineAoIntensity}
+          backscatterEnabled={pineBackscatterEnabled}
+          backscatterIntensity={pineBackscatterIntensity}
+          backscatterColor={pineBackscatterColor}
+          backscatterPower={pineBackscatterPower}
+          frontScatterStrength={pineFrontScatterStrength}
+          rimSSSStrength={pineRimSSSStrength}
+          lightDirectionX={pineLightDirectionX}
+          lightDirectionY={pineLightDirectionY}
+          lightDirectionZ={pineLightDirectionZ}
         />
       )}
     </group>

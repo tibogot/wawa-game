@@ -39,6 +39,17 @@ export const InstancedPines = ({
   enableViewThickening = true,
   viewThickenPower = 2.0,
   viewThickenStrength = 0.3,
+  aoEnabled = true,
+  aoIntensity = 1.0,
+  backscatterEnabled = true,
+  backscatterIntensity = 0.5,
+  backscatterColor = "#ccffb3",
+  backscatterPower = 2.0,
+  frontScatterStrength = 0.3,
+  rimSSSStrength = 0.5,
+  lightDirectionX = 1.0,
+  lightDirectionY = 1.0,
+  lightDirectionZ = 0.5,
 }) => {
   const { scene } = useGLTF("/models/pine-transformed.glb");
   const { scene: threeScene, gl, camera } = useThree();
@@ -211,62 +222,251 @@ export const InstancedPines = ({
         // Apply custom transparency settings to leaves (like InstancedMesh2Trees)
         if (isTransparent) {
           material.transparent = true;
-          material.alphaTest = 0.5; // Critical for shadow cutouts!
+          material.alphaTest = 0.1; // Lower threshold for better distance visibility (was 0.5)
           material.side = THREE.DoubleSide; // Render both sides of leaves
           // Use depthWrite based on alphaTest value (like InstancedMesh2Trees)
           // If alphaTest is high (>0.8), we can use depthWrite for better performance
           material.depthWrite = material.alphaTest > 0.8;
 
-          // Add view-space thickening shader effect for leaves (makes them less flat)
-          if (enableViewThickening) {
-            material.onBeforeCompile = (shader) => {
-              // Inject view-space thickening code (similar to FloatingLeaves2 and grass)
-              shader.vertexShader = shader.vertexShader.replace(
-                "#include <begin_vertex>",
-                `
-                #include <begin_vertex>
-                
-                // View-space thickening: Prevents leaves from disappearing when viewed edge-on
-                // Calculate instance world position (for instanced meshes)
-                vec3 instanceLocalPos = vec3(instanceMatrix[3].xyz);
-                vec4 instancePosWorld = modelMatrix * vec4(instanceLocalPos, 1.0);
-                vec3 instanceWorldPos = instancePosWorld.xyz;
-                
-                // Get camera position in world space
-                vec3 camPos = (inverse(viewMatrix) * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
-                
-                // Get view direction from camera to leaf
-                vec3 viewDir = normalize(camPos - instanceWorldPos);
-                
-                // Calculate vertex normal in world space
-                vec3 worldNormal = normalize(normalMatrix * objectNormal);
-                
-                // Calculate how edge-on we're viewing the leaf
-                float viewDotNormal = abs(dot(viewDir, worldNormal));
-                
-                // Thickening factor: high when edge-on (low dot), low when facing camera
-                float thickenFactor = pow(1.0 - viewDotNormal, ${viewThickenPower.toFixed(
-                  1
-                )});
-                
-                // Apply smoothing to avoid visual artifacts
-                thickenFactor *= smoothstep(0.0, 0.3, viewDotNormal);
-                
-                // Apply thickening by pushing vertices outward along the normal
-                // Use a small offset based on the model's scale
-                vec3 offset = worldNormal * thickenFactor * ${viewThickenStrength.toFixed(
-                  2
-                )} * 0.5;
-                transformed += offset;
-                `
-              );
-            };
-          }
-
           console.log(
             `   🍃 Leaves material: transparent=true, alphaTest=${material.alphaTest}, depthWrite=${material.depthWrite}, side=DoubleSide, viewThickening=${enableViewThickening}`
           );
         }
+
+        // Calculate bounding box for AO height calculation
+        meshData.geometry.computeBoundingBox();
+        const bbox = meshData.geometry.boundingBox;
+        const treeHeight = bbox.max.y - bbox.min.y;
+        const treeMinY = bbox.min.y;
+
+        // Apply shader effects to ALL materials (both trunk and leaves)
+        material.onBeforeCompile = (shader) => {
+          // Add AO uniforms
+          shader.uniforms.uAoEnabled = { value: aoEnabled };
+          shader.uniforms.uAoIntensity = { value: aoIntensity };
+
+          // Add SSS uniforms
+          const backscatterColorObj = new THREE.Color(backscatterColor);
+          shader.uniforms.uBackscatterEnabled = { value: backscatterEnabled };
+          shader.uniforms.uBackscatterIntensity = {
+            value: backscatterIntensity,
+          };
+          shader.uniforms.uBackscatterColor = { value: backscatterColorObj };
+          shader.uniforms.uBackscatterPower = { value: backscatterPower };
+          shader.uniforms.uFrontScatterStrength = {
+            value: frontScatterStrength,
+          };
+          shader.uniforms.uRimSSSStrength = { value: rimSSSStrength };
+          shader.uniforms.uLightDirection = {
+            value: new THREE.Vector3(
+              lightDirectionX,
+              lightDirectionY,
+              lightDirectionZ
+            ),
+          };
+
+          // Add varying for heightPercent and distance (for AO and distance-based alpha test)
+          shader.vertexShader = shader.vertexShader.replace(
+            "#include <common>",
+            `
+            #include <common>
+            varying float vTreeHeightPercent;
+            varying float vDistance;
+            `
+          );
+
+          // Calculate heightPercent and distance in vertex shader (for AO and distance-based alpha test)
+          shader.vertexShader = shader.vertexShader.replace(
+            "#include <begin_vertex>",
+            `
+            #include <begin_vertex>
+            
+            // Calculate heightPercent for AO: 0 = base, 1 = top
+            float heightPercent = clamp((position.y - ${treeMinY.toFixed(
+              4
+            )}) / ${treeHeight.toFixed(4)}, 0.0, 1.0);
+            vTreeHeightPercent = heightPercent;
+            
+            // Calculate distance from camera for distance-based alpha test
+            // Get instance world position (for instanced meshes)
+            vec3 instanceLocalPos = vec3(instanceMatrix[3].xyz);
+            vec4 instancePosWorld = modelMatrix * vec4(instanceLocalPos, 1.0);
+            vec3 instanceWorldPos = instancePosWorld.xyz;
+            
+            // Get camera position in world space
+            vec3 camPos = (inverse(viewMatrix) * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+            
+            // Calculate distance from camera
+            vDistance = length(camPos - instanceWorldPos);
+            `
+          );
+
+          // Apply view-space thickening for leaves (if enabled)
+          if (isTransparent && enableViewThickening) {
+            shader.vertexShader = shader.vertexShader.replace(
+              /#include <begin_vertex>[\s\S]*?vDistance = length\(camPos - instanceWorldPos\);/,
+              `
+              #include <begin_vertex>
+              
+              // Calculate heightPercent for AO: 0 = base, 1 = top
+              float heightPercent = clamp((position.y - ${treeMinY.toFixed(
+                4
+              )}) / ${treeHeight.toFixed(4)}, 0.0, 1.0);
+              vTreeHeightPercent = heightPercent;
+              
+              // Calculate distance from camera for distance-based alpha test
+              // Get instance world position (for instanced meshes)
+              vec3 instanceLocalPos = vec3(instanceMatrix[3].xyz);
+              vec4 instancePosWorld = modelMatrix * vec4(instanceLocalPos, 1.0);
+              vec3 instanceWorldPos = instancePosWorld.xyz;
+              
+              // Get camera position in world space
+              vec3 camPos = (inverse(viewMatrix) * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+              
+              // Calculate distance from camera
+              vDistance = length(camPos - instanceWorldPos);
+              
+              // View-space thickening: Prevents leaves from disappearing when viewed edge-on
+              // Get view direction from camera to leaf
+              vec3 viewDir = normalize(camPos - instanceWorldPos);
+              
+              // Calculate vertex normal in world space
+              vec3 worldNormal = normalize(normalMatrix * objectNormal);
+              
+              // Calculate how edge-on we're viewing the leaf
+              float viewDotNormal = abs(dot(viewDir, worldNormal));
+              
+              // Thickening factor: high when edge-on (low dot), low when facing camera
+              float thickenFactor = pow(1.0 - viewDotNormal, ${viewThickenPower.toFixed(
+                1
+              )});
+              
+              // Apply smoothing to avoid visual artifacts
+              thickenFactor *= smoothstep(0.0, 0.3, viewDotNormal);
+              
+              // Apply thickening by pushing vertices outward along the normal
+              // Use a small offset based on the model's scale
+              vec3 offset = worldNormal * thickenFactor * ${viewThickenStrength.toFixed(
+                2
+              )} * 0.5;
+              transformed += offset;
+              `
+            );
+          }
+
+          // Apply AO and SSS in fragment shader
+          shader.fragmentShader = shader.fragmentShader.replace(
+            "#include <common>",
+            `
+            #include <common>
+            varying float vTreeHeightPercent;
+            varying float vDistance;
+            uniform bool uAoEnabled;
+            uniform float uAoIntensity;
+            uniform bool uBackscatterEnabled;
+            uniform float uBackscatterIntensity;
+            uniform vec3 uBackscatterColor;
+            uniform float uBackscatterPower;
+            uniform float uFrontScatterStrength;
+            uniform float uRimSSSStrength;
+            uniform vec3 uLightDirection;
+            `
+          );
+
+          // Apply AO calculation and distance-based alpha test before color fragment
+          // Only apply distance-based alpha test for transparent materials
+          let fragmentCode = `
+            #include <color_fragment>
+            
+            // Ambient Occlusion: darker at base, brighter at top
+            if (uAoEnabled) {
+              // AO factor: 0.25 at base, 1.0 at top (smooth gradient)
+              float ao = mix(0.25, 1.0, pow(vTreeHeightPercent, 2.0));
+              diffuseColor.rgb *= ao * uAoIntensity;
+            }
+            `;
+
+          // Add distance-based alpha test only for transparent materials (leaves)
+          if (isTransparent) {
+            fragmentCode = `
+            #include <color_fragment>
+            
+            // Distance-based alpha test: lower threshold at distance to prevent transparency issues
+            // Base alphaTest is 0.1, but we make it more permissive at distance
+            // At distance > 50 units, gradually reduce threshold to 0.0
+            float distanceAlphaTest = 0.1;
+            if (vDistance > 50.0) {
+              // Smoothly reduce alphaTest threshold from 0.1 to 0.0 as distance increases from 50 to 200
+              float distanceFactor = clamp((vDistance - 50.0) / 150.0, 0.0, 1.0);
+              distanceAlphaTest = mix(0.1, 0.0, distanceFactor);
+            }
+            
+            // Apply distance-based alpha test (replace standard alphaTest)
+            if (diffuseColor.a < distanceAlphaTest) {
+              discard;
+            }
+            
+            // Ambient Occlusion: darker at base, brighter at top
+            if (uAoEnabled) {
+              // AO factor: 0.25 at base, 1.0 at top (smooth gradient)
+              float ao = mix(0.25, 1.0, pow(vTreeHeightPercent, 2.0));
+              diffuseColor.rgb *= ao * uAoIntensity;
+            }
+            `;
+          }
+
+          shader.fragmentShader = shader.fragmentShader.replace(
+            "#include <color_fragment>",
+            fragmentCode
+          );
+
+          // Apply SSS after lights are calculated
+          shader.fragmentShader = shader.fragmentShader.replace(
+            "#include <lights_fragment_end>",
+            `
+            #include <lights_fragment_end>
+            
+            // Subsurface Scattering: translucency effect for leaves
+            if (uBackscatterEnabled) {
+              // Calculate view direction (from Three.js shader chunks)
+              vec3 viewDir = normalize(-vViewPosition);
+              
+              // Normalize light direction
+              vec3 lightDir = normalize(uLightDirection);
+              
+              // Calculate backscatter - light coming through from behind
+              float backScatter = max(dot(-lightDir, normal), 0.0);
+              float frontScatter = max(dot(lightDir, normal), 0.0);
+              
+              // Rim lighting for edges (translucency effect)
+              float rim = 1.0 - max(dot(normal, viewDir), 0.0);
+              rim = pow(rim, 1.5);
+              
+              // Tree thickness factor (thicker at base, thinner at top)
+              float treeThickness = (1.0 - vTreeHeightPercent) * 0.8 + 0.2;
+              
+              // Enhanced SSS calculation with multiple scattering layers
+              float sssBack = pow(backScatter, uBackscatterPower) * treeThickness;
+              float sssFront = pow(frontScatter, 1.5) * treeThickness * uFrontScatterStrength;
+              float rimSSS = pow(rim, 2.0) * treeThickness * uRimSSSStrength;
+              
+              // Combine all subsurface scattering contributions
+              float totalSSS = sssBack + sssFront + rimSSS;
+              totalSSS = clamp(totalSSS, 0.0, 1.0);
+              
+              // Backscatter color (warm, slightly green-tinted for tree translucency)
+              vec3 backscatterColor = uBackscatterColor * 0.4;
+              
+              // Apply backscatter to diffuse lighting
+              vec3 backscatterContribution = backscatterColor * totalSSS * uBackscatterIntensity;
+              reflectedLight.directDiffuse += backscatterContribution;
+            }
+            `
+          );
+
+          // Store shader reference for uniform updates
+          material.userData.shader = shader;
+        };
 
         const instancedMesh = new InstancedMesh2(meshData.geometry, material, {
           capacity: count,
@@ -418,6 +618,20 @@ export const InstancedPines = ({
     lodMaterials,
     enableShadowLOD,
     shadowLodDistances,
+    enableViewThickening,
+    viewThickenPower,
+    viewThickenStrength,
+    aoEnabled,
+    aoIntensity,
+    backscatterEnabled,
+    backscatterIntensity,
+    backscatterColor,
+    backscatterPower,
+    frontScatterStrength,
+    rimSSSStrength,
+    lightDirectionX,
+    lightDirectionY,
+    lightDirectionZ,
     threeScene,
     gl,
     camera,
@@ -462,11 +676,60 @@ export const InstancedPines = ({
         instancedMesh.castShadow = castShadow;
         instancedMesh.receiveShadow = receiveShadow;
       }
+
+      // Update AO uniforms (if shader exists)
+      if (material.userData?.shader) {
+        const shader = material.userData.shader;
+        if (shader.uniforms.uAoEnabled) {
+          shader.uniforms.uAoEnabled.value = aoEnabled;
+        }
+        if (shader.uniforms.uAoIntensity) {
+          shader.uniforms.uAoIntensity.value = aoIntensity;
+        }
+
+        // Update SSS uniforms
+        if (shader.uniforms.uBackscatterEnabled) {
+          shader.uniforms.uBackscatterEnabled.value = backscatterEnabled;
+        }
+        if (shader.uniforms.uBackscatterIntensity) {
+          shader.uniforms.uBackscatterIntensity.value = backscatterIntensity;
+        }
+        if (shader.uniforms.uBackscatterColor) {
+          shader.uniforms.uBackscatterColor.value.set(backscatterColor);
+        }
+        if (shader.uniforms.uBackscatterPower) {
+          shader.uniforms.uBackscatterPower.value = backscatterPower;
+        }
+        if (shader.uniforms.uFrontScatterStrength) {
+          shader.uniforms.uFrontScatterStrength.value = frontScatterStrength;
+        }
+        if (shader.uniforms.uRimSSSStrength) {
+          shader.uniforms.uRimSSSStrength.value = rimSSSStrength;
+        }
+        if (shader.uniforms.uLightDirection) {
+          shader.uniforms.uLightDirection.value.set(
+            lightDirectionX,
+            lightDirectionY,
+            lightDirectionZ
+          );
+        }
+      }
     });
   }, [
     castShadow,
     receiveShadow,
     enableTransparentSorting,
+    aoEnabled,
+    aoIntensity,
+    backscatterEnabled,
+    backscatterIntensity,
+    backscatterColor,
+    backscatterPower,
+    frontScatterStrength,
+    rimSSSStrength,
+    lightDirectionX,
+    lightDirectionY,
+    lightDirectionZ,
     // Note: viewThickenPower/Strength changes require recreation (shader recompilation)
     // This is acceptable as these are rarely changed
   ]);
