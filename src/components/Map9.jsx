@@ -50,6 +50,8 @@ import { ImpostorForest } from "./ImpostorForest";
 import { useImpostorForestControls } from "./useImpostorForestControls";
 import { InstancedTrees } from "./InstancedTrees";
 import { useInstancedTreesControls } from "./useInstancedTreesControls";
+import { InstancedBillboardTrees } from "./InstancedBillboardTrees";
+import { useInstancedBillboardTreesControls } from "./useInstancedBillboardTreesControls";
 import { InstancedPines } from "./InstancedPines";
 import { useInstancedPinesControls } from "./useInstancedPinesControls";
 // import { Lake } from "./Lake";
@@ -411,6 +413,39 @@ export const Map9 = forwardRef(
       pineLightDirectionY,
       pineLightDirectionZ,
     } = useInstancedPinesControls();
+
+    // Get InstancedBillboardTrees controls
+    const {
+      instancedBillboardTreesEnabled,
+      instancedBillboardTreeCount,
+      instancedBillboardPositionX,
+      instancedBillboardPositionY,
+      instancedBillboardPositionZ,
+      instancedBillboardRadius,
+      instancedBillboardMinRadius,
+      billboardScaleRangeMin,
+      billboardScaleRangeMax,
+      billboardYOffset,
+      billboardCastShadow,
+      billboardReceiveShadow,
+      billboardEnableTransparentSorting,
+      billboardEnableBVH,
+      billboardBvhMargin,
+      billboardEnableViewThickening,
+      billboardViewThickenPower,
+      billboardViewThickenStrength,
+      billboardAoEnabled,
+      billboardAoIntensity,
+      billboardBackscatterEnabled,
+      billboardBackscatterIntensity,
+      billboardBackscatterColor,
+      billboardBackscatterPower,
+      billboardFrontScatterStrength,
+      billboardRimSSSStrength,
+      billboardLightDirectionX,
+      billboardLightDirectionY,
+      billboardLightDirectionZ,
+    } = useInstancedBillboardTreesControls();
 
     // Create stable fallback vectors
     const fallbackPosition = useMemo(() => new THREE.Vector3(0, 0, 0), []);
@@ -1093,6 +1128,43 @@ export const Map9 = forwardRef(
             lightDirectionX={pineLightDirectionX}
             lightDirectionY={pineLightDirectionY}
             lightDirectionZ={pineLightDirectionZ}
+          />
+        )}
+
+        {/* Instanced Billboard Trees - Using InstancedMesh2 */}
+        {instancedBillboardTreesEnabled && heightmapLookup && (
+          <InstancedBillboardTrees
+            count={instancedBillboardTreeCount}
+            position={[
+              instancedBillboardPositionX,
+              instancedBillboardPositionY,
+              instancedBillboardPositionZ,
+            ]}
+            radius={instancedBillboardRadius}
+            minRadius={instancedBillboardMinRadius}
+            scaleRange={[billboardScaleRangeMin, billboardScaleRangeMax]}
+            enabled={instancedBillboardTreesEnabled}
+            getTerrainHeight={getGroundHeight}
+            yOffset={billboardYOffset}
+            enableBVH={billboardEnableBVH}
+            bvhMargin={billboardBvhMargin}
+            castShadow={billboardCastShadow}
+            receiveShadow={billboardReceiveShadow}
+            enableTransparentSorting={billboardEnableTransparentSorting}
+            enableViewThickening={billboardEnableViewThickening}
+            viewThickenPower={billboardViewThickenPower}
+            viewThickenStrength={billboardViewThickenStrength}
+            aoEnabled={billboardAoEnabled}
+            aoIntensity={billboardAoIntensity}
+            backscatterEnabled={billboardBackscatterEnabled}
+            backscatterIntensity={billboardBackscatterIntensity}
+            backscatterColor={billboardBackscatterColor}
+            backscatterPower={billboardBackscatterPower}
+            frontScatterStrength={billboardFrontScatterStrength}
+            rimSSSStrength={billboardRimSSSStrength}
+            lightDirectionX={billboardLightDirectionX}
+            lightDirectionY={billboardLightDirectionY}
+            lightDirectionZ={billboardLightDirectionZ}
           />
         )}
 

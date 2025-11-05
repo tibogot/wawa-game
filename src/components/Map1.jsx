@@ -20,6 +20,7 @@ import { useGrassClaude4Controls } from "./useGrassClaude4Controls";
 import { useImpostorForestControls } from "./useImpostorForestControls";
 import { useLeafPileMountainControls } from "./useLeafPileMountainControls";
 import { useInstancedTreesControls } from "./useInstancedTreesControls";
+import { useInstancedBillboardTreesControls } from "./useInstancedBillboardTreesControls";
 import { useInstancedPinesControls } from "./useInstancedPinesControls";
 import { useLensFlareControls } from "./useLensFlareControls";
 import LensFlare from "./LensFlare";
@@ -32,6 +33,7 @@ import { FloatingLeaves } from "./FloatingLeaves";
 import { Skybox } from "./Skybox";
 import { Tree } from "./Tree";
 import { InstancedTrees } from "./InstancedTrees";
+import { InstancedBillboardTrees } from "./InstancedBillboardTrees";
 import { InstancedPines } from "./InstancedPines";
 import * as THREE from "three";
 
@@ -181,6 +183,39 @@ export const Map1 = ({
     viewThickenPower,
     viewThickenStrength,
   } = useInstancedTreesControls();
+
+  // Get InstancedBillboardTrees controls
+  const {
+    instancedBillboardTreesEnabled,
+    instancedBillboardTreeCount,
+    instancedBillboardPositionX,
+    instancedBillboardPositionY,
+    instancedBillboardPositionZ,
+    instancedBillboardRadius,
+    instancedBillboardMinRadius,
+    billboardScaleRangeMin,
+    billboardScaleRangeMax,
+    billboardYOffset,
+    billboardCastShadow,
+    billboardReceiveShadow,
+    billboardEnableTransparentSorting,
+    billboardEnableBVH,
+    billboardBvhMargin,
+    billboardEnableViewThickening,
+    billboardViewThickenPower,
+    billboardViewThickenStrength,
+    billboardAoEnabled,
+    billboardAoIntensity,
+    billboardBackscatterEnabled,
+    billboardBackscatterIntensity,
+    billboardBackscatterColor,
+    billboardBackscatterPower,
+    billboardFrontScatterStrength,
+    billboardRimSSSStrength,
+    billboardLightDirectionX,
+    billboardLightDirectionY,
+    billboardLightDirectionZ,
+  } = useInstancedBillboardTreesControls();
 
   // Get InstancedPines controls
   const {
@@ -701,6 +736,43 @@ export const Map1 = ({
           enableViewThickening={enableViewThickening}
           viewThickenPower={viewThickenPower}
           viewThickenStrength={viewThickenStrength}
+        />
+      )}
+
+      {/* Instanced Billboard Trees - Using InstancedMesh2 */}
+      {instancedBillboardTreesEnabled && (
+        <InstancedBillboardTrees
+          count={instancedBillboardTreeCount}
+          position={[
+            instancedBillboardPositionX,
+            instancedBillboardPositionY,
+            instancedBillboardPositionZ,
+          ]}
+          radius={instancedBillboardRadius}
+          minRadius={instancedBillboardMinRadius}
+          scaleRange={[billboardScaleRangeMin, billboardScaleRangeMax]}
+          enabled={instancedBillboardTreesEnabled}
+          getTerrainHeight={getGroundHeight}
+          yOffset={billboardYOffset}
+          enableBVH={billboardEnableBVH}
+          bvhMargin={billboardBvhMargin}
+          castShadow={billboardCastShadow}
+          receiveShadow={billboardReceiveShadow}
+          enableTransparentSorting={billboardEnableTransparentSorting}
+          enableViewThickening={billboardEnableViewThickening}
+          viewThickenPower={billboardViewThickenPower}
+          viewThickenStrength={billboardViewThickenStrength}
+          aoEnabled={billboardAoEnabled}
+          aoIntensity={billboardAoIntensity}
+          backscatterEnabled={billboardBackscatterEnabled}
+          backscatterIntensity={billboardBackscatterIntensity}
+          backscatterColor={billboardBackscatterColor}
+          backscatterPower={billboardBackscatterPower}
+          frontScatterStrength={billboardFrontScatterStrength}
+          rimSSSStrength={billboardRimSSSStrength}
+          lightDirectionX={billboardLightDirectionX}
+          lightDirectionY={billboardLightDirectionY}
+          lightDirectionZ={billboardLightDirectionZ}
         />
       )}
 
