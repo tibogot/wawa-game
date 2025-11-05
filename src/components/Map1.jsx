@@ -20,6 +20,7 @@ import { useGrassClaude4Controls } from "./useGrassClaude4Controls";
 import { useImpostorForestControls } from "./useImpostorForestControls";
 import { useLeafPileMountainControls } from "./useLeafPileMountainControls";
 import { useInstancedTreesControls } from "./useInstancedTreesControls";
+import { useInstancedPinesControls } from "./useInstancedPinesControls";
 import { useLensFlareControls } from "./useLensFlareControls";
 import LensFlare from "./LensFlare";
 import { FlowingLinesSimple } from "./FlowingLinesSimple";
@@ -31,6 +32,7 @@ import { FloatingLeaves } from "./FloatingLeaves";
 import { Skybox } from "./Skybox";
 import { Tree } from "./Tree";
 import { InstancedTrees } from "./InstancedTrees";
+import { InstancedPines } from "./InstancedPines";
 import * as THREE from "three";
 
 export const Map1 = ({
@@ -179,6 +181,27 @@ export const Map1 = ({
     viewThickenPower,
     viewThickenStrength,
   } = useInstancedTreesControls();
+
+  // Get InstancedPines controls
+  const {
+    instancedPinesEnabled,
+    instancedPineCount,
+    instancedPinePositionX,
+    instancedPinePositionY,
+    instancedPinePositionZ,
+    instancedPineRadius,
+    instancedPineMinRadius,
+    pineScaleRangeMin,
+    pineScaleRangeMax,
+    pineCastShadow,
+    pineReceiveShadow,
+    pineEnableTransparentSorting,
+    pineEnableBVH,
+    pineBvhMargin,
+    pineEnableViewThickening,
+    pineViewThickenPower,
+    pineViewThickenStrength,
+  } = useInstancedPinesControls();
 
   // Get LensFlare controls
   const {
@@ -667,6 +690,31 @@ export const Map1 = ({
           enableViewThickening={enableViewThickening}
           viewThickenPower={viewThickenPower}
           viewThickenStrength={viewThickenStrength}
+        />
+      )}
+
+      {/* Instanced Pines - Using InstancedMesh2 */}
+      {instancedPinesEnabled && (
+        <InstancedPines
+          count={instancedPineCount}
+          position={[
+            instancedPinePositionX,
+            instancedPinePositionY,
+            instancedPinePositionZ,
+          ]}
+          radius={instancedPineRadius}
+          minRadius={instancedPineMinRadius}
+          scaleRange={[pineScaleRangeMin, pineScaleRangeMax]}
+          enabled={instancedPinesEnabled}
+          getTerrainHeight={getGroundHeight}
+          enableBVH={pineEnableBVH}
+          bvhMargin={pineBvhMargin}
+          castShadow={pineCastShadow}
+          receiveShadow={pineReceiveShadow}
+          enableTransparentSorting={pineEnableTransparentSorting}
+          enableViewThickening={pineEnableViewThickening}
+          viewThickenPower={pineViewThickenPower}
+          viewThickenStrength={pineViewThickenStrength}
         />
       )}
     </group>
