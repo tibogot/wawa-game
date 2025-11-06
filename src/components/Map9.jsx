@@ -1,4 +1,5 @@
 import { useRef, useState, useCallback, useMemo, forwardRef } from "react";
+import { useControls, folder } from "leva";
 import * as THREE from "three";
 import { ProceduralTerrain5 } from "./ProceduralTerrain5";
 import { ProceduralTerrain6 } from "./ProceduralTerrain6";
@@ -27,6 +28,7 @@ import { FloorDebugSpheres } from "./FloorDebugSpheres";
 import { useFloorDebugSpheresControls } from "./useFloorDebugSpheresControls";
 import { FloatingLeaves } from "./FloatingLeaves";
 import { FloatingLeaves2 } from "./FloatingLeaves2";
+import FallingLeaves from "./FallingLeaves";
 import { ButterflyParticles } from "./ButterflyParticles";
 import { useButterflyParticlesControls } from "./useButterflyParticlesControls";
 import { Mountain } from "./Mountain";
@@ -489,6 +491,95 @@ export const Map9 = forwardRef(
       animatedTree2NoiseTexturePath,
       animatedTree2PoleTexturePath,
     } = useAnimatedTree2Controls();
+
+    // Get FallingLeaves controls
+    const {
+      fallingLeavesEnabled,
+      fallingLeavesTexture,
+      fallingLeavesColor,
+      fallingLeavesCount,
+      fallingLeavesRotationSpeed,
+      fallingLeavesSpawnAreaSize,
+      fallingLeavesSpawnHeightMin,
+      fallingLeavesSpawnHeightMax,
+      fallingLeavesSpawnCenterX,
+      fallingLeavesSpawnCenterY,
+      fallingLeavesSpawnCenterZ,
+    } = useControls("🌿 FOLIAGE", {
+      fallingLeaves: folder(
+        {
+          fallingLeavesEnabled: {
+            value: false,
+            label: "🍃 Enable Falling Leaves",
+          },
+          fallingLeavesTexture: {
+            value: "/textures/leaf 2.jpg",
+            label: "📄 Leaf Texture",
+          },
+          fallingLeavesColor: {
+            value: "#ffc219",
+            label: "🎨 Leaf Color",
+          },
+          fallingLeavesCount: {
+            value: 50,
+            min: 10,
+            max: 200,
+            step: 10,
+            label: "🔢 Leaf Count",
+          },
+          fallingLeavesRotationSpeed: {
+            value: 0.015,
+            min: 0.001,
+            max: 0.1,
+            step: 0.001,
+            label: "🌀 Rotation Speed",
+          },
+          fallingLeavesSpawnAreaSize: {
+            value: 3,
+            min: 1,
+            max: 20,
+            step: 0.5,
+            label: "📐 Spawn Area Size",
+          },
+          fallingLeavesSpawnHeightMin: {
+            value: -3,
+            min: -20,
+            max: 20,
+            step: 0.5,
+            label: "⬇️ Spawn Height Min",
+          },
+          fallingLeavesSpawnHeightMax: {
+            value: 3,
+            min: -20,
+            max: 20,
+            step: 0.5,
+            label: "⬆️ Spawn Height Max",
+          },
+          fallingLeavesSpawnCenterX: {
+            value: 0,
+            min: -50,
+            max: 50,
+            step: 1,
+            label: "📍 Center X",
+          },
+          fallingLeavesSpawnCenterY: {
+            value: 0,
+            min: -20,
+            max: 20,
+            step: 1,
+            label: "📍 Center Y",
+          },
+          fallingLeavesSpawnCenterZ: {
+            value: 0,
+            min: -50,
+            max: 50,
+            step: 1,
+            label: "📍 Center Z",
+          },
+        },
+        { collapsed: true }
+      ),
+    });
 
     // Create stable fallback vectors
     const fallbackPosition = useMemo(() => new THREE.Vector3(0, 0, 0), []);
@@ -972,6 +1063,24 @@ export const Map9 = forwardRef(
         {heightmapLookup && (
           <FloatingLeaves2
             characterPosition={characterPosition || fallbackPosition}
+            getTerrainHeight={getGroundHeight}
+          />
+        )}
+        {/* Falling Leaves - Shader-based falling leaves */}
+        {fallingLeavesEnabled && heightmapLookup && (
+          <FallingLeaves
+            leafTexture={fallingLeavesTexture}
+            leafColor={fallingLeavesColor}
+            count={fallingLeavesCount}
+            rotationSpeed={fallingLeavesRotationSpeed}
+            spawnAreaSize={fallingLeavesSpawnAreaSize}
+            spawnHeightMin={fallingLeavesSpawnHeightMin}
+            spawnHeightMax={fallingLeavesSpawnHeightMax}
+            spawnCenter={[
+              fallingLeavesSpawnCenterX,
+              fallingLeavesSpawnCenterY,
+              fallingLeavesSpawnCenterZ,
+            ]}
             getTerrainHeight={getGroundHeight}
           />
         )}

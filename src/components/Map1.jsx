@@ -32,6 +32,7 @@ import { useAdBillboardControls } from "./useAdBillboardControls";
 import { RipplePlane } from "./RipplePlane";
 import { FloatingLeaves2 } from "./FloatingLeaves2";
 import { FloatingLeaves } from "./FloatingLeaves";
+import FallingLeaves from "./FallingLeaves";
 import { Skybox } from "./Skybox";
 import { Tree } from "./Tree";
 import { InstancedTrees } from "./InstancedTrees";
@@ -156,7 +157,21 @@ export const Map1 = ({
   } = useLeafPileMountainControls();
 
   // Get Tree control (single tree component)
-  const { treeEnabled, animatedTreeEnabled } = useControls("🌿 FOLIAGE", {
+  const {
+    treeEnabled,
+    animatedTreeEnabled,
+    fallingLeavesEnabled,
+    fallingLeavesTexture,
+    fallingLeavesColor,
+    fallingLeavesCount,
+    fallingLeavesRotationSpeed,
+    fallingLeavesSpawnAreaSize,
+    fallingLeavesSpawnHeightMin,
+    fallingLeavesSpawnHeightMax,
+    fallingLeavesSpawnCenterX,
+    fallingLeavesSpawnCenterY,
+    fallingLeavesSpawnCenterZ,
+  } = useControls("🌿 FOLIAGE", {
     tree: folder(
       {
         treeEnabled: {
@@ -171,6 +186,79 @@ export const Map1 = ({
         animatedTreeEnabled: {
           value: false,
           label: "🌳 Enable Animated Tree",
+        },
+      },
+      { collapsed: true }
+    ),
+    fallingLeaves: folder(
+      {
+        fallingLeavesEnabled: {
+          value: false,
+          label: "🍃 Enable Falling Leaves",
+        },
+        fallingLeavesTexture: {
+          value: "/textures/leaf 2.jpg",
+          label: "📄 Leaf Texture",
+        },
+        fallingLeavesColor: {
+          value: "#ffc219",
+          label: "🎨 Leaf Color",
+        },
+        fallingLeavesCount: {
+          value: 50,
+          min: 10,
+          max: 200,
+          step: 10,
+          label: "🔢 Leaf Count",
+        },
+        fallingLeavesRotationSpeed: {
+          value: 0.015,
+          min: 0.001,
+          max: 0.1,
+          step: 0.001,
+          label: "🌀 Rotation Speed",
+        },
+        fallingLeavesSpawnAreaSize: {
+          value: 3,
+          min: 1,
+          max: 20,
+          step: 0.5,
+          label: "📐 Spawn Area Size",
+        },
+        fallingLeavesSpawnHeightMin: {
+          value: -3,
+          min: -20,
+          max: 20,
+          step: 0.5,
+          label: "⬇️ Spawn Height Min",
+        },
+        fallingLeavesSpawnHeightMax: {
+          value: 3,
+          min: -20,
+          max: 20,
+          step: 0.5,
+          label: "⬆️ Spawn Height Max",
+        },
+        fallingLeavesSpawnCenterX: {
+          value: 0,
+          min: -50,
+          max: 50,
+          step: 1,
+          label: "📍 Center X",
+        },
+        fallingLeavesSpawnCenterY: {
+          value: 0,
+          min: -20,
+          max: 20,
+          step: 1,
+          label: "📍 Center Y",
+        },
+        fallingLeavesSpawnCenterZ: {
+          value: 0,
+          min: -50,
+          max: 50,
+          step: 1,
+          label: "📍 Center Z",
         },
       },
       { collapsed: true }
@@ -775,6 +863,24 @@ export const Map1 = ({
 
       {/* Floating Leaves - Regular floating leaves */}
       <FloatingLeaves getTerrainHeight={getGroundHeight} />
+
+      {/* Falling Leaves - Shader-based falling leaves */}
+      {fallingLeavesEnabled && (
+        <FallingLeaves
+          leafTexture={fallingLeavesTexture}
+          leafColor={fallingLeavesColor}
+          count={fallingLeavesCount}
+          rotationSpeed={fallingLeavesRotationSpeed}
+          spawnAreaSize={fallingLeavesSpawnAreaSize}
+          spawnHeightMin={fallingLeavesSpawnHeightMin}
+          spawnHeightMax={fallingLeavesSpawnHeightMax}
+          spawnCenter={[
+            fallingLeavesSpawnCenterX,
+            fallingLeavesSpawnCenterY,
+            fallingLeavesSpawnCenterZ,
+          ]}
+        />
+      )}
 
       {/* Tree */}
       {treeEnabled && (

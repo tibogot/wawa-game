@@ -834,7 +834,7 @@ export const GodotCharacterHybrid = ({
             : capsuleHeight / 2,
           capsuleRadius,
         ]}
-        friction={0}
+        friction={0.5}
         restitution={0}
       />
     </RigidBody>
