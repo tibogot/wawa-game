@@ -1256,9 +1256,11 @@ export function GrassField({
     return result;
   }, [gridSize, patchSpacing, centerPosition]);
 
-  // Track which patches should skip frustum culling (close to player)
+  // Constants for hybrid distance + frustum culling system
   const patchRefsRef = useRef(new Map());
-  const CLOSE_DISTANCE = 30; // Within this distance, disable frustum culling
+  const CLOSE_DISTANCE = 30; // Within this distance, always render (safety zone)
+  const MAX_CULLING_DISTANCE = 200; // Don't check frustum beyond this distance (performance)
+  const CULLING_MARGIN = 10; // Expand bounding boxes to prevent edge culling issues (increased for better coverage)
 
   // Create refs for all patches
   const patchRefs = useMemo(() => {
@@ -1272,46 +1274,76 @@ export function GrassField({
     });
   }, [patchRefs]);
 
-  // Update camera matrices and patch frustum culling each frame
+  // Hybrid culling: Distance-based for far patches + Frustum to cull behind camera
+  // This gives best performance: far grass visible in front, all grass behind culled
+  const frustumRef = useRef(new THREE.Frustum());
+
   useFrame(() => {
-    // Update camera matrices (critical for proper frustum culling)
+    // Update camera matrices for frustum calculation
     camera.updateMatrixWorld(true);
     camera.updateProjectionMatrix();
 
-    if (!playerPosition) {
-      // No player position - all patches use frustum culling
-      patchRefsRef.current.forEach((patchRef) => {
-        if (patchRef?.current) {
-          patchRef.current.frustumCulled = true;
-        }
-      });
-      return;
-    }
+    // Calculate frustum for culling patches behind camera
+    const cameraMatrix = new THREE.Matrix4();
+    cameraMatrix.multiplyMatrices(
+      camera.projectionMatrix,
+      camera.matrixWorldInverse
+    );
+    frustumRef.current.setFromProjectionMatrix(cameraMatrix);
 
-    const playerPos =
-      playerPosition instanceof THREE.Vector3
-        ? playerPosition
-        : new THREE.Vector3(
-            playerPosition[0],
-            playerPosition[1],
-            playerPosition[2]
-          );
+    // Get camera position for distance-based culling
+    const cameraPos = camera.position;
+    const cameraPosXZ = new THREE.Vector3(cameraPos.x, 0, cameraPos.z);
 
-    // Update frustum culling for each patch based on distance to player
+    // Hybrid culling: Distance + Frustum
     allPatches.forEach((patchPos, index) => {
+      const patchRef = patchRefsRef.current.get(index);
+      if (!patchRef?.current) return;
+
       const patchX = patchPos[0];
       const patchZ = patchPos[2];
+      const patchCenterXZ = new THREE.Vector3(patchX, 0, patchZ);
 
-      const distance = Math.sqrt(
-        Math.pow(patchX - playerPos.x, 2) + Math.pow(patchZ - playerPos.z, 2)
+      // First check: Distance-based culling (for far patches)
+      const distance = cameraPosXZ.distanceTo(patchCenterXZ);
+
+      // Patches within CLOSE_DISTANCE always render (safety zone)
+      if (distance <= CLOSE_DISTANCE) {
+        patchRef.current.frustumCulled = false;
+        patchRef.current.visible = true;
+        return;
+      }
+
+      // Patches beyond MAX_CULLING_DISTANCE are always hidden
+      if (distance > MAX_CULLING_DISTANCE) {
+        patchRef.current.frustumCulled = false;
+        patchRef.current.visible = false;
+        return;
+      }
+
+      // Second check: Frustum culling (for patches behind/outside camera)
+      // Create bounding box for patch
+      const patchSize = patchSpacing;
+      const halfSize = patchSize / 2 + CULLING_MARGIN;
+      const grassHeight = 4.0;
+      const groundY = patchPos[1] || 0;
+
+      const boundingBox = new THREE.Box3(
+        new THREE.Vector3(patchX - halfSize, groundY - 3, patchZ - halfSize),
+        new THREE.Vector3(
+          patchX + halfSize,
+          groundY + grassHeight + 3,
+          patchZ + halfSize
+        )
       );
 
-      const patchRef = patchRefsRef.current.get(index);
-      if (patchRef?.current) {
-        // Disable frustum culling for patches close to player
-        // Enable frustum culling for distant patches (Three.js will handle it)
-        patchRef.current.frustumCulled = distance > CLOSE_DISTANCE;
-      }
+      // Check if patch is in camera frustum
+      const isInFrustum = frustumRef.current.intersectsBox(boundingBox);
+
+      // Render if: within distance AND in frustum
+      // This allows far grass in front, but culls all grass behind camera
+      patchRef.current.frustumCulled = false;
+      patchRef.current.visible = isInFrustum;
     });
   });
 
