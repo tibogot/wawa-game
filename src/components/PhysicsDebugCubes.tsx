@@ -4,10 +4,12 @@ import * as THREE from "three";
 
 interface PhysicsDebugCubesProps {
   enabled?: boolean;
+  spawnHeight?: number; // Y position to spawn cubes at (should be high above terrain)
 }
 
 export const PhysicsDebugCubes: React.FC<PhysicsDebugCubesProps> = ({
-  enabled = true,
+  enabled = false,
+  spawnHeight = 20,
 }) => {
   if (!enabled) return null;
 
@@ -19,7 +21,7 @@ export const PhysicsDebugCubes: React.FC<PhysicsDebugCubesProps> = ({
       <RigidBody
         type="dynamic"
         colliders="cuboid"
-        position={[-5, 0.5, 0]}
+        position={[-5, spawnHeight, 0]}
         mass={1}
         friction={0.5}
         restitution={0.1}
@@ -40,7 +42,7 @@ export const PhysicsDebugCubes: React.FC<PhysicsDebugCubesProps> = ({
       <RigidBody
         type="dynamic"
         colliders="cuboid"
-        position={[-3, 0.5, 0]}
+        position={[-3, spawnHeight, 0]}
         mass={1}
         friction={0.5}
         restitution={0.1}
@@ -61,7 +63,7 @@ export const PhysicsDebugCubes: React.FC<PhysicsDebugCubesProps> = ({
       <RigidBody
         type="dynamic"
         colliders="cuboid"
-        position={[3, 0.5, 0]}
+        position={[3, spawnHeight, 0]}
         mass={5}
         friction={0.5}
         restitution={0.1}
@@ -82,7 +84,7 @@ export const PhysicsDebugCubes: React.FC<PhysicsDebugCubesProps> = ({
       <RigidBody
         type="dynamic"
         colliders="cuboid"
-        position={[5, 0.5, 0]}
+        position={[5, spawnHeight, 0]}
         mass={5}
         friction={0.5}
         restitution={0.1}
@@ -103,7 +105,7 @@ export const PhysicsDebugCubes: React.FC<PhysicsDebugCubesProps> = ({
       <RigidBody
         type="dynamic"
         colliders="cuboid"
-        position={[-5, 0.5, 3]}
+        position={[-5, spawnHeight, 3]}
         mass={15}
         friction={0.6}
         restitution={0.05}
@@ -124,7 +126,7 @@ export const PhysicsDebugCubes: React.FC<PhysicsDebugCubesProps> = ({
       <RigidBody
         type="dynamic"
         colliders="cuboid"
-        position={[-3, 0.5, 3]}
+        position={[-3, spawnHeight, 3]}
         mass={15}
         friction={0.6}
         restitution={0.05}
@@ -145,7 +147,7 @@ export const PhysicsDebugCubes: React.FC<PhysicsDebugCubesProps> = ({
       <RigidBody
         type="dynamic"
         colliders="cuboid"
-        position={[0, 0.5, 3]}
+        position={[0, spawnHeight, 3]}
         mass={30}
         friction={0.7}
         restitution={0}
@@ -166,7 +168,7 @@ export const PhysicsDebugCubes: React.FC<PhysicsDebugCubesProps> = ({
       <RigidBody
         type="dynamic"
         colliders="cuboid"
-        position={[3, 0.5, 3]}
+        position={[3, spawnHeight, 3]}
         mass={0.5}
         friction={0.3}
         restitution={0.3}
@@ -189,7 +191,7 @@ export const PhysicsDebugCubes: React.FC<PhysicsDebugCubesProps> = ({
           key={`stack-${i}`}
           type="dynamic"
           colliders="cuboid"
-          position={[5, 0.5 + i * 1.05, 3]}
+          position={[5, spawnHeight + i * 1.05, 3]}
           mass={2}
           friction={0.5}
           restitution={0.1}
@@ -211,7 +213,7 @@ export const PhysicsDebugCubes: React.FC<PhysicsDebugCubesProps> = ({
       <RigidBody
         type="dynamic"
         colliders="cuboid"
-        position={[-7, 0.75, 6]}
+        position={[-7, spawnHeight + 0.25, 6]}
         mass={50}
         friction={0.8}
         restitution={0}
@@ -232,7 +234,7 @@ export const PhysicsDebugCubes: React.FC<PhysicsDebugCubesProps> = ({
       <RigidBody
         type="dynamic"
         colliders="cuboid"
-        position={[7, 0.25, 2]}
+        position={[7, spawnHeight - 0.25, 2]}
         mass={0.2}
         friction={0.2}
         restitution={0.5}
@@ -253,7 +255,7 @@ export const PhysicsDebugCubes: React.FC<PhysicsDebugCubesProps> = ({
       <RigidBody
         type="dynamic"
         colliders="cuboid"
-        position={[0, 0.5, -3]}
+        position={[0, spawnHeight, -3]}
         mass={40}
         friction={0.5}
         restitution={0}

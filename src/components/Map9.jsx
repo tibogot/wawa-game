@@ -60,6 +60,7 @@ import { InstancedPines } from "./InstancedPines";
 import { useInstancedPinesControls } from "./useInstancedPinesControls";
 import { AnimatedTree2 } from "./AnimatedTree2";
 import { useAnimatedTree2Controls } from "./useAnimatedTree2Controls";
+import { PhysicsDebugCubes } from "./PhysicsDebugCubes";
 // import { Lake } from "./Lake";
 
 export const Map9 = forwardRef(
@@ -580,6 +581,27 @@ export const Map9 = forwardRef(
         { collapsed: true }
       ),
     });
+
+    // Get PhysicsDebugCubes controls
+    const { physicsDebugCubesEnabled, physicsDebugCubesSpawnHeight } =
+      useControls("🔧 DEBUG", {
+        physicsDebugCubes: folder(
+          {
+            physicsDebugCubesEnabled: {
+              value: false,
+              label: "📦 Enable Physics Debug Cubes",
+            },
+            physicsDebugCubesSpawnHeight: {
+              value: 20,
+              min: 5,
+              max: 50,
+              step: 1,
+              label: "⬆️ Spawn Height",
+            },
+          },
+          { collapsed: true }
+        ),
+      });
 
     // Create stable fallback vectors
     const fallbackPosition = useMemo(() => new THREE.Vector3(0, 0, 0), []);
@@ -1391,6 +1413,13 @@ export const Map9 = forwardRef(
         )}
 
         {/* <Lake position={[0, -5, 0]} /> */}
+        {/* Physics Debug Cubes - Only render when terrain is ready */}
+        {isTerrainMeshReady && (
+          <PhysicsDebugCubes
+            enabled={physicsDebugCubesEnabled}
+            spawnHeight={physicsDebugCubesSpawnHeight}
+          />
+        )}
       </group>
     );
   }

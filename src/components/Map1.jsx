@@ -41,6 +41,8 @@ import { InstancedPines } from "./InstancedPines";
 import { AnimatedTree } from "./AnimatedTree";
 import { AnimatedTree2 } from "./AnimatedTree2";
 import { useAnimatedTree2Controls } from "./useAnimatedTree2Controls";
+import { useInstancedAnimatedTreesControls } from "./useInstancedAnimatedTreesControls";
+import { InstancedAnimatedTrees } from "./InstancedAnimatedTrees";
 import * as THREE from "three";
 
 export const Map1 = ({
@@ -305,6 +307,9 @@ export const Map1 = ({
     viewThickenPower,
     viewThickenStrength,
   } = useInstancedTreesControls();
+
+  // Get InstancedAnimatedTrees controls
+  const { instancedAnimatedTreesEnabled } = useInstancedAnimatedTreesControls();
 
   // Get InstancedBillboardTrees controls
   const {
@@ -1019,6 +1024,28 @@ export const Map1 = ({
           lightDirectionX={pineLightDirectionX}
           lightDirectionY={pineLightDirectionY}
           lightDirectionZ={pineLightDirectionZ}
+        />
+      )}
+
+      {/* Instanced Animated Trees - Using InstancedMesh2 with custom shader */}
+      {instancedAnimatedTreesEnabled && (
+        <InstancedAnimatedTrees
+          count={50}
+          position={[0, 0, 0]}
+          radius={50}
+          minRadius={0}
+          scaleRange={[0.8, 1.2]}
+          enabled={instancedAnimatedTreesEnabled}
+          getTerrainHeight={getGroundHeight}
+          colorA="#b45252"
+          colorB="#d3a068"
+          colorC="#ede19e"
+          gradientThreshold={0.7}
+          gradientPower={1.0}
+          castShadow={true}
+          receiveShadow={true}
+          enableBVH={true}
+          bvhMargin={0.1}
         />
       )}
     </group>
