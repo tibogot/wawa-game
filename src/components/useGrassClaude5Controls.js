@@ -92,6 +92,20 @@ export function useGrassClaude5Controls() {
               value: "#cce666",
               label: "Tip Color 2 (Light)",
             },
+            gradientBlend: {
+              value: 1.0,
+              min: 0.0,
+              max: 1.0,
+              step: 0.01,
+              label: "🎨 Gradient Blend (0=Base, 1=Full)",
+            },
+            gradientCurve: {
+              value: 4.0,
+              min: 0.5,
+              max: 10.0,
+              step: 0.1,
+              label: "📈 Gradient Curve (Steepness)",
+            },
           },
           { collapsed: true }
         ),

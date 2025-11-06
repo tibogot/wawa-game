@@ -253,6 +253,8 @@ uniform vec3 uBaseColor1;
 uniform vec3 uBaseColor2;
 uniform vec3 uTipColor1;
 uniform vec3 uTipColor2;
+uniform float uGradientBlend; // 0.0 = all base, 1.0 = full gradient
+uniform float uGradientCurve; // Controls curve steepness (higher = more tip color at top)
 
 // Wind uniforms
 uniform bool uWindEnabled;
@@ -463,8 +465,15 @@ void main() {
 
   vec3 baseColour = mix(b1, b2, hashGrassColour.x);
   vec3 tipColour = mix(t1, t2, hashGrassColour.y);
-  vec3 highLODColour = mix(baseColour, tipColour, easeIn(heightPercent, 4.0)) * randomShade;
-  vec3 lowLODColour = mix(b1, t1, heightPercent);
+  
+  // Calculate gradient blend with customizable curve
+  float gradientFactor = easeIn(heightPercent, uGradientCurve);
+  gradientFactor = mix(0.0, gradientFactor, uGradientBlend); // Apply blend control
+  vec3 highLODColour = mix(baseColour, tipColour, gradientFactor) * randomShade;
+  
+  // Low LOD also respects gradient blend
+  float lowLODGradient = mix(0.0, heightPercent, uGradientBlend);
+  vec3 lowLODColour = mix(b1, t1, lowLODGradient);
   vGrassColour = mix(highLODColour, lowLODColour, highLODOut);
   vGrassParams = vec4(heightPercent, grassBladeWorldPos.y, highLODOut, xSide);
   
@@ -892,6 +901,8 @@ export function GrassPatch({
   baseColor2 = "#061a03",
   tipColor1 = "#a6cc40",
   tipColor2 = "#cce666",
+  gradientBlend = 1.0, // 0.0 = all base color, 1.0 = full base-to-tip gradient
+  gradientCurve = 4.0, // Curve steepness (higher = tip color appears more at top)
   backscatterEnabled = true, // Backscatter/SSS controls
   backscatterIntensity = 0.5,
   backscatterColor = "#ccffb3",
@@ -994,6 +1005,8 @@ export function GrassPatch({
       shader.uniforms.uBaseColor2 = { value: baseColor2Ref.current };
       shader.uniforms.uTipColor1 = { value: tipColor1Ref.current };
       shader.uniforms.uTipColor2 = { value: tipColor2Ref.current };
+      shader.uniforms.uGradientBlend = { value: gradientBlend };
+      shader.uniforms.uGradientCurve = { value: gradientCurve };
 
       // Wind uniforms
       shader.uniforms.uWindEnabled = { value: windEnabled };
@@ -1078,6 +1091,8 @@ export function GrassPatch({
     baseColor2,
     tipColor1,
     tipColor2,
+    gradientBlend,
+    gradientCurve,
     backscatterEnabled,
     backscatterIntensity,
     backscatterColor,
@@ -1159,6 +1174,8 @@ export function GrassPatch({
       shader.uniforms.uBaseColor2.value.copy(baseColor2Ref.current);
       shader.uniforms.uTipColor1.value.copy(tipColor1Ref.current);
       shader.uniforms.uTipColor2.value.copy(tipColor2Ref.current);
+      shader.uniforms.uGradientBlend.value = gradientBlend;
+      shader.uniforms.uGradientCurve.value = gradientCurve;
 
       // Update wind uniforms
       shader.uniforms.uWindEnabled.value = windEnabled;

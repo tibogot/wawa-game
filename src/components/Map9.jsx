@@ -146,6 +146,8 @@ export const Map9 = forwardRef(
       baseColor2: baseColor2_5,
       tipColor1: tipColor1_5,
       tipColor2: tipColor2_5,
+      gradientBlend: gradientBlend5,
+      gradientCurve: gradientCurve5,
       backscatterEnabled: backscatterEnabled5,
       backscatterIntensity: backscatterIntensity5,
       backscatterColor: backscatterColor5,
@@ -804,6 +806,8 @@ export const Map9 = forwardRef(
               baseColor2={baseColor2_5}
               tipColor1={tipColor1_5}
               tipColor2={tipColor2_5}
+              gradientBlend={gradientBlend5}
+              gradientCurve={gradientCurve5}
               backscatterEnabled={backscatterEnabled5}
               backscatterIntensity={backscatterIntensity5}
               backscatterColor={backscatterColor5}
