@@ -45,6 +45,19 @@ export const useAnimatedTree2Controls = () => {
           value: true,
           label: "🖱️ Enable Mouse Interaction",
         },
+        shadows: folder(
+          {
+            animatedTree2CastShadow: {
+              value: true,
+              label: "🌑 Cast Shadows",
+            },
+            animatedTree2ReceiveShadow: {
+              value: true,
+              label: "🌑 Receive Shadows",
+            },
+          },
+          { collapsed: true }
+        ),
         colors: folder(
           {
             animatedTree2ColorA: {

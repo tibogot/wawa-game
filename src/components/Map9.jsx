@@ -56,6 +56,8 @@ import { InstancedBillboardTrees } from "./InstancedBillboardTrees";
 import { useInstancedBillboardTreesControls } from "./useInstancedBillboardTreesControls";
 import { InstancedPines } from "./InstancedPines";
 import { useInstancedPinesControls } from "./useInstancedPinesControls";
+import { AnimatedTree2 } from "./AnimatedTree2";
+import { useAnimatedTree2Controls } from "./useAnimatedTree2Controls";
 // import { Lake } from "./Lake";
 
 export const Map9 = forwardRef(
@@ -468,6 +470,26 @@ export const Map9 = forwardRef(
       billboardLightDirectionZ,
     } = useInstancedBillboardTreesControls();
 
+    // Get AnimatedTree2 controls
+    const {
+      animatedTree2Enabled,
+      animatedTree2PositionX,
+      animatedTree2PositionY,
+      animatedTree2PositionZ,
+      animatedTree2Scale,
+      animatedTree2MouseInteraction,
+      animatedTree2CastShadow,
+      animatedTree2ReceiveShadow,
+      animatedTree2ColorA,
+      animatedTree2ColorB,
+      animatedTree2ColorC,
+      animatedTree2GradientThreshold,
+      animatedTree2GradientPower,
+      animatedTree2ModelPath,
+      animatedTree2NoiseTexturePath,
+      animatedTree2PoleTexturePath,
+    } = useAnimatedTree2Controls();
+
     // Create stable fallback vectors
     const fallbackPosition = useMemo(() => new THREE.Vector3(0, 0, 0), []);
     const fallbackVelocity = useMemo(() => new THREE.Vector3(0, 0, 0), []);
@@ -646,6 +668,13 @@ export const Map9 = forwardRef(
         `Map9 - WindFlag at [${windFlagPosition[0]}, ${windFlagPosition[2]}] -> terrain height: ${windFlagTerrainHeight}`
       );
     }
+
+    // Calculate terrain height for AnimatedTree2 position
+    const animatedTree2TerrainHeight =
+      animatedTree2Enabled && heightmapLookup
+        ? getGroundHeight(animatedTree2PositionX, animatedTree2PositionZ) +
+          animatedTree2PositionY
+        : animatedTree2PositionY;
 
     // Calculate terrain height for AdBillboard position
     // AdBillboard positions pylon center at pylonHeight/2 above group position
@@ -1189,6 +1218,29 @@ export const Map9 = forwardRef(
             lightDirectionX={pineLightDirectionX}
             lightDirectionY={pineLightDirectionY}
             lightDirectionZ={pineLightDirectionZ}
+          />
+        )}
+
+        {/* Animated Tree 2 - Interactive tree with full controls */}
+        {animatedTree2Enabled && heightmapLookup && (
+          <AnimatedTree2
+            position={[
+              animatedTree2PositionX,
+              animatedTree2TerrainHeight,
+              animatedTree2PositionZ,
+            ]}
+            scale={animatedTree2Scale}
+            enableMouseInteraction={animatedTree2MouseInteraction}
+            castShadow={animatedTree2CastShadow}
+            receiveShadow={animatedTree2ReceiveShadow}
+            colorA={animatedTree2ColorA}
+            colorB={animatedTree2ColorB}
+            colorC={animatedTree2ColorC}
+            gradientThreshold={animatedTree2GradientThreshold}
+            gradientPower={animatedTree2GradientPower}
+            treeModelPath={animatedTree2ModelPath}
+            noiseTexturePath={animatedTree2NoiseTexturePath}
+            poleTexturePath={animatedTree2PoleTexturePath}
           />
         )}
 

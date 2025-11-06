@@ -185,6 +185,8 @@ export const Map1 = ({
     animatedTree2PositionZ,
     animatedTree2Scale,
     animatedTree2MouseInteraction,
+    animatedTree2CastShadow,
+    animatedTree2ReceiveShadow,
     animatedTree2ColorA,
     animatedTree2ColorB,
     animatedTree2ColorC,
@@ -803,6 +805,8 @@ export const Map1 = ({
           ]}
           scale={animatedTree2Scale}
           enableMouseInteraction={animatedTree2MouseInteraction}
+          castShadow={animatedTree2CastShadow}
+          receiveShadow={animatedTree2ReceiveShadow}
           colorA={animatedTree2ColorA}
           colorB={animatedTree2ColorB}
           colorC={animatedTree2ColorC}

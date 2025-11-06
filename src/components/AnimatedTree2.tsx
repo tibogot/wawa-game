@@ -44,9 +44,24 @@ const leavesVS = /*glsl*/ `
   
           mat4 mouseDisplace = mat4(1.);
   
+          // Get position in instance space (before modelMatrix transform)
+          // This is in the same coordinate space as uBoxMin
+          vec3 instancePos = vec3(instanceMatrix * vec4(position, 1.));
+          
+          // Calculate object space position relative to bounding box
+          // This should be in model/instance space, not world space
+          vObjectPos = ((instancePos - uBoxMin) * 2.) / uBoxSize - vec3(1.0);
+          
+          // Now calculate world position for other calculations
           vec3 vWorldPos = vec3(modelMatrix * instanceMatrix * mouseDisplace * vec4(position, 1.));
   
-          vCloseToGround = clamp(vWorldPos.y, 0., 1.);
+          // Calculate close to ground relative to tree's bounding box (not absolute world Y)
+          // This makes it work regardless of terrain height
+          float leafHeightRelativeToTree = instancePos.y - uBoxMin.y;
+          float treeHeight = uBoxSize.y;
+          // Normalize to 0-1 range, where 0 is at tree base and 1 is at tree top
+          // Then invert so lower leaves have higher value (closer to ground)
+          vCloseToGround = clamp(1.0 - (leafHeightRelativeToTree / max(treeHeight, 0.001)), 0.0, 1.0);
   
           float offset = clamp(0.8 - distance(uRaycast, instanceMatrix[3].xyz), 0., 999.); 
   
@@ -56,9 +71,7 @@ const leavesVS = /*glsl*/ `
   
           vNormal = normalMatrix * mat3(instanceMatrix) * mat3(mouseDisplace) * normalize(normal); 
   
-          vWorldNormal = vec3(modelMatrix * instanceMatrix * mouseDisplace * vec4(normal, 0.));
-  
-          vObjectPos = ((vWorldPos - uBoxMin) * 2.) / uBoxSize - vec3(1.0); 
+          vWorldNormal = vec3(modelMatrix * instanceMatrix * mouseDisplace * vec4(normal, 0.)); 
   
           vec4 noiseOffset = getTriplanar(uNoiseMap) * vCloseToGround; 
   
@@ -165,6 +178,8 @@ interface AnimatedTree2Props {
   colorC?: string | THREE.Color;
   gradientThreshold?: number;
   gradientPower?: number;
+  castShadow?: boolean;
+  receiveShadow?: boolean;
 }
 
 export const AnimatedTree2: React.FC<AnimatedTree2Props> = ({
@@ -179,6 +194,8 @@ export const AnimatedTree2: React.FC<AnimatedTree2Props> = ({
   colorC = "#ede19e",
   gradientThreshold = 0.7,
   gradientPower = 1.0,
+  castShadow = true,
+  receiveShadow = true,
 }) => {
   const groupRef = useRef<THREE.Group>(null);
   const leavesRef = useRef<THREE.InstancedMesh>(null);
@@ -245,14 +262,30 @@ export const AnimatedTree2: React.FC<AnimatedTree2Props> = ({
 
     // Clone geometries to avoid modifying originals
     const poleClone = pole.clone();
-    if (poleTexture && poleClone instanceof THREE.Mesh) {
-      poleClone.material = new THREE.MeshToonMaterial({
-        map: poleTexture,
-      });
+    if (poleClone instanceof THREE.Mesh) {
+      // Set shadow properties
+      poleClone.castShadow = castShadow;
+      poleClone.receiveShadow = receiveShadow;
+
+      if (poleTexture) {
+        poleClone.material = new THREE.MeshToonMaterial({
+          map: poleTexture,
+        });
+      }
     }
 
     // Calculate bounding box for shader
+    // Need to ensure the crown's world matrix is updated
+    if (crown instanceof THREE.Mesh) {
+      crown.updateWorldMatrix(true, false);
+    }
+
     const bbox = new THREE.Box3().setFromObject(crown);
+    // Transform bounding box to world space if crown has world matrix
+    // But since we're calculating from the object directly, setFromObject should handle transforms
+    // However, we need to ensure the bbox is relative to where the tree will be placed
+    // For now, keep it in local space but we'll update the shader to handle this correctly
+
     const bboxMin = bbox.min.clone();
     const bboxSize = bbox.getSize(new THREE.Vector3());
 
@@ -271,7 +304,7 @@ export const AnimatedTree2: React.FC<AnimatedTree2Props> = ({
       bboxSize,
       leavesCount,
     };
-  }, [gltf.scene, poleTexture]);
+  }, [gltf.scene, poleTexture, castShadow, receiveShadow]);
 
   // Convert color props to THREE.Color
   const colorAValue = useMemo(() => {
@@ -393,8 +426,12 @@ export const AnimatedTree2: React.FC<AnimatedTree2Props> = ({
     leavesMaterial.uniforms.uBoxMin.value.copy(treeData.bboxMin);
     leavesMaterial.uniforms.uBoxSize.value.copy(treeData.bboxSize);
 
+    // Set shadow properties
+    leaves.castShadow = castShadow;
+    leaves.receiveShadow = receiveShadow;
+
     return leaves;
-  }, [treeData, leavesMaterial]);
+  }, [treeData, leavesMaterial, castShadow, receiveShadow]);
 
   // Dead leaves state
   const [deadID, setDeadID] = useState<number[]>([]);
