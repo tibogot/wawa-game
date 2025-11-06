@@ -438,6 +438,7 @@ export const AnimatedTree2: React.FC<AnimatedTree2Props> = ({
   const matrix = useRef(new THREE.Matrix4());
   const dummy = useRef(new THREE.Object3D());
   const quaternion = useRef(new THREE.Quaternion());
+  const worldPosition = useRef(new THREE.Vector3());
 
   // Initialize dead leaves
   useEffect(() => {
@@ -516,7 +517,8 @@ export const AnimatedTree2: React.FC<AnimatedTree2Props> = ({
   // Animation loop
   const timeRef = useRef(0);
   useFrame(() => {
-    if (!leavesMesh || !leavesMaterial || !treeData) return;
+    if (!leavesMesh || !leavesMaterial || !treeData || !groupRef.current)
+      return;
 
     // Update time uniform (cumulative, matching original)
     timeRef.current += 0.01;
@@ -525,6 +527,10 @@ export const AnimatedTree2: React.FC<AnimatedTree2Props> = ({
     // Update dead leaves (falling animation)
     if (deadID.length > 0 && leavesMesh) {
       const updatedDead: number[] = [];
+
+      // Get the group's world matrix to transform local positions to world space
+      groupRef.current.updateWorldMatrix(true, false);
+      const groupWorldMatrix = groupRef.current.matrixWorld;
 
       deadID.forEach((i) => {
         if (i === undefined || i === null) return;
@@ -539,7 +545,14 @@ export const AnimatedTree2: React.FC<AnimatedTree2Props> = ({
         // Convert quaternion to euler for rotation manipulation
         dummy.current.rotation.setFromQuaternion(quaternion.current);
 
-        if (dummy.current.position.y > 0) {
+        // Transform local position to world space for ground check
+        // Create a temporary matrix that represents the world transform
+        const tempMatrix = groupWorldMatrix.clone().multiply(matrix.current);
+        worldPosition.current.setFromMatrixPosition(tempMatrix);
+
+        // Check against ground level in world space (ground is at y = 0)
+        if (worldPosition.current.y > 0) {
+          // Update the local position (this is in instanced mesh local space)
           dummy.current.position.y -= 0.04;
           dummy.current.position.x += Math.random() / 5 - 0.11;
           dummy.current.position.z += Math.random() / 5 - 0.11;
