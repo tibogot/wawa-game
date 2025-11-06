@@ -43,6 +43,7 @@ export const FloatingLeaves2: React.FC<FloatingLeavesProps> = ({
     leafSize,
     gravity,
     useTexture,
+    texturePath,
   } = useControls("🌪️ Tornado Leaves", {
     enabled: { value: defaultEnableLeaves, label: "Enable Tornado" },
     count: {
@@ -113,6 +114,15 @@ export const FloatingLeaves2: React.FC<FloatingLeavesProps> = ({
       step: 0.0005,
     },
     useTexture: { value: defaultUseTexture, label: "Use Texture" },
+    texturePath: {
+      value: "/textures/leaf1-tiny.png",
+      label: "🌿 Leaf Texture",
+      options: {
+        "Leaf 1 (Default)": "/textures/leaf1-tiny.png",
+        "Leaf 2": "/textures/leaf 2.jpg",
+        Pngwingo: "/textures/pngwingo.png",
+      },
+    },
   });
   const instancedMeshRef = useRef<THREE.InstancedMesh>(null);
   const { windUniforms } = useGlobalWind();
@@ -122,12 +132,12 @@ export const FloatingLeaves2: React.FC<FloatingLeavesProps> = ({
 
   useEffect(() => {
     const textureLoader = new THREE.TextureLoader();
-    const texturePath = useTexture
-      ? "/textures/leaf1-tiny.png"
+    const textureToLoad = useTexture
+      ? texturePath
       : "/textures/whitesquare.png";
 
     textureLoader.load(
-      texturePath,
+      textureToLoad,
       (texture) => {
         // High quality texture settings
         texture.wrapS = THREE.RepeatWrapping;
@@ -159,7 +169,7 @@ export const FloatingLeaves2: React.FC<FloatingLeavesProps> = ({
         }
       }
     );
-  }, [useTexture]);
+  }, [useTexture, texturePath]);
 
   // Create leaf geometry (simple plane)
   const leafGeometry = useMemo(() => {

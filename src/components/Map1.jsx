@@ -37,6 +37,9 @@ import { Tree } from "./Tree";
 import { InstancedTrees } from "./InstancedTrees";
 import { InstancedBillboardTrees } from "./InstancedBillboardTrees";
 import { InstancedPines } from "./InstancedPines";
+import { AnimatedTree } from "./AnimatedTree";
+import { AnimatedTree2 } from "./AnimatedTree2";
+import { useAnimatedTree2Controls } from "./useAnimatedTree2Controls";
 import * as THREE from "three";
 
 export const Map1 = ({
@@ -153,7 +156,7 @@ export const Map1 = ({
   } = useLeafPileMountainControls();
 
   // Get Tree control (single tree component)
-  const { treeEnabled } = useControls("🌿 FOLIAGE", {
+  const { treeEnabled, animatedTreeEnabled } = useControls("🌿 FOLIAGE", {
     tree: folder(
       {
         treeEnabled: {
@@ -163,7 +166,34 @@ export const Map1 = ({
       },
       { collapsed: true }
     ),
+    animatedTree: folder(
+      {
+        animatedTreeEnabled: {
+          value: false,
+          label: "🌳 Enable Animated Tree",
+        },
+      },
+      { collapsed: true }
+    ),
   });
+
+  // Get AnimatedTree2 controls
+  const {
+    animatedTree2Enabled,
+    animatedTree2PositionX,
+    animatedTree2PositionY,
+    animatedTree2PositionZ,
+    animatedTree2Scale,
+    animatedTree2MouseInteraction,
+    animatedTree2ColorA,
+    animatedTree2ColorB,
+    animatedTree2ColorC,
+    animatedTree2GradientThreshold,
+    animatedTree2GradientPower,
+    animatedTree2ModelPath,
+    animatedTree2NoiseTexturePath,
+    animatedTree2PoleTexturePath,
+  } = useAnimatedTree2Controls();
 
   // Get InstancedTrees controls
   const {
@@ -751,6 +781,36 @@ export const Map1 = ({
           scale={1}
           enabled={true}
           getTerrainHeight={getGroundHeight}
+        />
+      )}
+
+      {/* Animated Tree - Interactive tree with falling leaves */}
+      {animatedTreeEnabled && (
+        <AnimatedTree
+          position={[0, 0, 0]}
+          scale={1}
+          enableMouseInteraction={true}
+        />
+      )}
+
+      {/* Animated Tree 2 - Interactive tree with full controls */}
+      {animatedTree2Enabled && (
+        <AnimatedTree2
+          position={[
+            animatedTree2PositionX,
+            animatedTree2PositionY,
+            animatedTree2PositionZ,
+          ]}
+          scale={animatedTree2Scale}
+          enableMouseInteraction={animatedTree2MouseInteraction}
+          colorA={animatedTree2ColorA}
+          colorB={animatedTree2ColorB}
+          colorC={animatedTree2ColorC}
+          gradientThreshold={animatedTree2GradientThreshold}
+          gradientPower={animatedTree2GradientPower}
+          treeModelPath={animatedTree2ModelPath}
+          noiseTexturePath={animatedTree2NoiseTexturePath}
+          poleTexturePath={animatedTree2PoleTexturePath}
         />
       )}
 
