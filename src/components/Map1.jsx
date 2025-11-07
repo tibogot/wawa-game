@@ -34,6 +34,7 @@ import { FloatingLeaves2 } from "./FloatingLeaves2";
 import { FloatingLeaves } from "./FloatingLeaves";
 import FallingLeaves from "./FallingLeaves";
 import { Skybox } from "./Skybox";
+import HorizonSky from "./HorizonSky";
 import { Tree } from "./Tree";
 import { InstancedTrees } from "./InstancedTrees";
 import { InstancedBillboardTrees } from "./InstancedBillboardTrees";
@@ -468,6 +469,12 @@ export const Map1 = ({
   // Get FlowingLines, RipplePlane, Ice, and Forest controls - Map1 specific
   const {
     skyboxEnabled,
+    horizonSkyEnabled,
+    horizonSkyTopColor,
+    horizonSkyBottomColor,
+    horizonSkyOffset,
+    horizonSkyExponent,
+    horizonSkyRadius,
     flowingLinesEnabled,
     ripplePlaneEnabled,
     ripplePlaneSize,
@@ -507,6 +514,44 @@ export const Map1 = ({
         skyboxEnabled: {
           value: true,
           label: "🌌 Enable Skybox",
+        },
+      },
+      { collapsed: true }
+    ),
+    horizonSky: folder(
+      {
+        horizonSkyEnabled: {
+          value: true,
+          label: "🌅 Enable Horizon Sky",
+        },
+        horizonSkyTopColor: {
+          value: "#0077ff",
+          label: "🎨 Top Color",
+        },
+        horizonSkyBottomColor: {
+          value: "#ffffff",
+          label: "🎨 Bottom Color",
+        },
+        horizonSkyOffset: {
+          value: 33,
+          min: 0,
+          max: 100,
+          step: 1,
+          label: "⬆️ Offset",
+        },
+        horizonSkyExponent: {
+          value: 0.6,
+          min: 0.1,
+          max: 5,
+          step: 0.1,
+          label: "📈 Exponent",
+        },
+        horizonSkyRadius: {
+          value: 4000,
+          min: 500,
+          max: 8000,
+          step: 100,
+          label: "🪐 Radius",
         },
       },
       { collapsed: true }
@@ -786,6 +831,16 @@ export const Map1 = ({
   return (
     <group ref={group} {...props}>
       {skyboxEnabled && <Skybox />}
+      {horizonSkyEnabled && (
+        <HorizonSky
+          topColor={horizonSkyTopColor}
+          bottomColor={horizonSkyBottomColor}
+          offset={horizonSkyOffset}
+          exponent={horizonSkyExponent}
+          radius={horizonSkyRadius}
+        />
+      )}
+
       <RigidBody type="fixed" colliders="trimesh">
         <mesh
           position={position}
