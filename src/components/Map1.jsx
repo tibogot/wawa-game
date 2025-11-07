@@ -43,7 +43,20 @@ import { AnimatedTree2 } from "./AnimatedTree2";
 import { useAnimatedTree2Controls } from "./useAnimatedTree2Controls";
 import { useInstancedAnimatedTreesControls } from "./useInstancedAnimatedTreesControls";
 import { InstancedAnimatedTrees } from "./InstancedAnimatedTrees";
+import Water from "./Water";
+import Ice from "./Ice";
 import * as THREE from "three";
+import {
+  MeshBasicMaterial,
+  MeshPhysicalMaterial,
+  MeshNormalMaterial,
+  MeshToonMaterial,
+  MeshStandardMaterial,
+  MeshPhongMaterial,
+  MeshLambertMaterial,
+  MeshMatcapMaterial,
+  MeshDepthMaterial,
+} from "three";
 
 export const Map1 = ({
   scale = 1,
@@ -400,7 +413,7 @@ export const Map1 = ({
     flareDistance,
   } = useLensFlareControls();
 
-  // Get FlowingLines and RipplePlane controls - Map1 specific
+  // Get FlowingLines, RipplePlane, Water, and Ice controls - Map1 specific
   const {
     skyboxEnabled,
     flowingLinesEnabled,
@@ -416,6 +429,27 @@ export const Map1 = ({
     ripplePlanePositionX,
     ripplePlanePositionY,
     ripplePlanePositionZ,
+    waterEnabled,
+    waterBaseMaterial,
+    waterColor,
+    waterHighlightColor,
+    waterBrightness,
+    waterFlatshading,
+    waterSize,
+    waterSegments,
+    iceEnabled,
+    iceBaseMaterial,
+    iceColor,
+    frostColor,
+    crackColor,
+    frostIntensity,
+    crackIntensity,
+    iceThickness,
+    iceBrightness,
+    iceDisplacementScale,
+    iceFlatshading,
+    iceSize,
+    iceSegments,
   } = useControls("🗺️ MAP 1", {
     skybox: folder(
       {
@@ -514,6 +548,152 @@ export const Map1 = ({
           max: 100,
           step: 1,
           label: "📍 Pos Z",
+        },
+      },
+      { collapsed: true }
+    ),
+    water: folder(
+      {
+        waterEnabled: {
+          value: false,
+          label: "🌊 Enable Water",
+        },
+        waterBaseMaterial: {
+          options: {
+            MeshPhysicalMaterial,
+            MeshBasicMaterial,
+            MeshMatcapMaterial,
+            MeshNormalMaterial,
+            MeshStandardMaterial,
+            MeshPhongMaterial,
+            MeshToonMaterial,
+            MeshLambertMaterial,
+            MeshDepthMaterial,
+          },
+          value: MeshPhysicalMaterial,
+          label: "📦 Base Material",
+        },
+        waterColor: {
+          value: "#52a7f7",
+          label: "🎨 Water Color",
+        },
+        waterHighlightColor: {
+          value: "#b3ffff",
+          label: "✨ Highlight Color",
+        },
+        waterBrightness: {
+          value: 0.5,
+          min: 0,
+          max: 1,
+          step: 0.01,
+          label: "💡 Brightness",
+        },
+        waterFlatshading: {
+          value: false,
+          label: "🔲 Flat Shading",
+        },
+        waterSize: {
+          value: 5,
+          min: 1,
+          max: 100,
+          step: 1,
+          label: "📐 Size",
+        },
+        waterSegments: {
+          value: 64,
+          min: 16,
+          max: 512,
+          step: 8,
+          label: "🔲 Segments",
+        },
+      },
+      { collapsed: true }
+    ),
+    ice: folder(
+      {
+        iceEnabled: {
+          value: false,
+          label: "🧊 Enable Ice",
+        },
+        iceBaseMaterial: {
+          options: {
+            MeshPhysicalMaterial,
+            MeshBasicMaterial,
+            MeshMatcapMaterial,
+            MeshNormalMaterial,
+            MeshStandardMaterial,
+            MeshPhongMaterial,
+            MeshToonMaterial,
+            MeshLambertMaterial,
+            MeshDepthMaterial,
+          },
+          value: MeshPhysicalMaterial,
+          label: "📦 Base Material",
+        },
+        iceColor: {
+          value: "#a8d8f0",
+          label: "🧊 Ice Color",
+        },
+        frostColor: {
+          value: "#e8f4f8",
+          label: "❄️ Frost Color",
+        },
+        crackColor: {
+          value: "#6b9dc4",
+          label: "💎 Crack Color",
+        },
+        frostIntensity: {
+          value: 0.3,
+          min: 0,
+          max: 1,
+          step: 0.01,
+          label: "❄️ Frost Intensity",
+        },
+        crackIntensity: {
+          value: 0.5,
+          min: 0,
+          max: 1,
+          step: 0.01,
+          label: "💎 Crack Intensity",
+        },
+        iceThickness: {
+          value: 0.2,
+          min: 0.1,
+          max: 1.0,
+          step: 0.01,
+          label: "📏 Thickness",
+        },
+        iceBrightness: {
+          value: 1.0,
+          min: 0,
+          max: 2,
+          step: 0.01,
+          label: "💡 Brightness",
+        },
+        iceDisplacementScale: {
+          value: 0.02,
+          min: 0,
+          max: 0.1,
+          step: 0.001,
+          label: "🌊 Displacement Scale",
+        },
+        iceFlatshading: {
+          value: false,
+          label: "🔲 Flat Shading",
+        },
+        iceSize: {
+          value: 5,
+          min: 1,
+          max: 100,
+          step: 1,
+          label: "📐 Size",
+        },
+        iceSegments: {
+          value: 64,
+          min: 16,
+          max: 256,
+          step: 8,
+          label: "🔲 Segments",
         },
       },
       { collapsed: true }
@@ -857,6 +1037,37 @@ export const Map1 = ({
           rippleFrequency={ripplePlaneFrequency}
           color={ripplePlaneColor}
           opacity={ripplePlaneOpacity}
+        />
+      )}
+
+      {/* Water - Shader-based water surface */}
+      {waterEnabled && (
+        <Water
+          base={waterBaseMaterial}
+          waterColor={waterColor}
+          waterHighlightColor={waterHighlightColor}
+          waterBrightness={waterBrightness}
+          flatShading={waterFlatshading}
+          size={waterSize}
+          segments={waterSegments}
+        />
+      )}
+
+      {/* Ice - Shader-based ice/crystal surface */}
+      {iceEnabled && (
+        <Ice
+          base={iceBaseMaterial}
+          iceColor={iceColor}
+          frostColor={frostColor}
+          crackColor={crackColor}
+          frostIntensity={frostIntensity}
+          crackIntensity={crackIntensity}
+          thickness={iceThickness}
+          brightness={iceBrightness}
+          displacementScale={iceDisplacementScale}
+          flatShading={iceFlatshading}
+          size={iceSize}
+          segments={iceSegments}
         />
       )}
 
