@@ -51,6 +51,17 @@ export const InstancedBillboardTrees = ({
   lightDirectionX = 1.0,
   lightDirectionY = 1.0,
   lightDirectionZ = 0.5,
+  alphaTest = 0.1,
+  premultiplyAlpha = true,
+  edgeBleedCompensation = 1.0,
+  enableDistanceAlphaTest = true,
+  distanceAlphaStart = 50.0,
+  distanceAlphaEnd = 200.0,
+  enableRotation = true,
+  rotationDampingDistance = 10.0,
+  rotationStopDistance = 5.0,
+  rotationThreshold = 0.05,
+  rotationSmoothing = 0.15,
 }) => {
   const { scene } = useGLTF("/models/treebillboard-transformed.glb");
   const { scene: threeScene, gl, camera } = useThree();
@@ -63,6 +74,12 @@ export const InstancedBillboardTrees = ({
 
   // Store instance positions for billboard rotation (need to update to face camera)
   const instancePositionsRef = useRef([]);
+
+  // Store original scales for each instance (CRITICAL: prevents drift from matrix decomposition)
+  const instanceScalesRef = useRef([]);
+
+  // Store previous rotation angles for each instance (for smoothing and threshold)
+  const previousRotationsRef = useRef([]);
 
   // ========== CORE SETUP: Only recreate when essential props change ==========
   useEffect(() => {
@@ -110,6 +127,25 @@ export const InstancedBillboardTrees = ({
 
           // Update bounding box after transformation
           geometry.computeBoundingBox();
+
+          // CRITICAL: Center geometry in X/Z plane so rotation happens around center
+          // This prevents X-axis shifting when rotating billboards
+          // Keep Y as-is (base should stay at bottom for terrain placement)
+          const bbox = geometry.boundingBox;
+          if (bbox) {
+            const centerX = (bbox.min.x + bbox.max.x) / 2;
+            const centerZ = (bbox.min.z + bbox.max.z) / 2;
+            // Translate geometry so center is at (0, Y, 0) - center X/Z at origin
+            if (Math.abs(centerX) > 0.001 || Math.abs(centerZ) > 0.001) {
+              geometry.translate(-centerX, 0, -centerZ);
+              geometry.computeBoundingBox(); // Recompute after translation
+              console.log(
+                `   📐 Centered ${
+                  child.name || `mesh_${meshes.length}`
+                } geometry: X=${centerX.toFixed(2)}, Z=${centerZ.toFixed(2)}`
+              );
+            }
+          }
 
           meshes.push({
             geometry: geometry,
@@ -231,13 +267,18 @@ export const InstancedBillboardTrees = ({
         // Apply custom transparency settings to leaves (like InstancedMesh2Trees)
         if (isTransparent) {
           material.transparent = true;
-          material.alphaTest = 0.1; // Lower value for smoother edges (prevents white halo)
+          material.alphaTest = alphaTest; // Use configurable alpha test threshold
           material.side = THREE.DoubleSide; // Render both sides of leaves
           // Always disable depthWrite for transparent materials to prevent white halo
           // This ensures proper depth sorting and smooth blending
           material.depthWrite = false;
           // Use proper blending for smooth transparency
           material.blending = THREE.NormalBlending;
+
+          // Enable premultiplied alpha if requested (fixes white edges)
+          if (premultiplyAlpha) {
+            material.premultipliedAlpha = true;
+          }
 
           // Calculate bounding box for AO height calculation
           meshData.geometry.computeBoundingBox();
@@ -355,17 +396,59 @@ export const InstancedBillboardTrees = ({
 
             // Add distance-based alpha test only for transparent materials (leaves)
             if (isTransparent) {
+              // Build distance-based alpha test code
+              let distanceAlphaTestCode = "";
+              if (enableDistanceAlphaTest) {
+                distanceAlphaTestCode = `
+            // Distance-based alpha test: lower threshold at distance to prevent transparency issues
+            float distanceAlphaTest = ${alphaTest.toFixed(3)};
+            if (vDistance > ${distanceAlphaStart.toFixed(1)}) {
+              // Smoothly reduce alphaTest threshold from base to 0.0 as distance increases
+              float distanceRange = ${distanceAlphaEnd.toFixed(
+                1
+              )} - ${distanceAlphaStart.toFixed(1)};
+              float distanceFactor = clamp((vDistance - ${distanceAlphaStart.toFixed(
+                1
+              )}) / distanceRange, 0.0, 1.0);
+              distanceAlphaTest = mix(${alphaTest.toFixed(
+                3
+              )}, 0.0, distanceFactor);
+            }
+            `;
+              } else {
+                distanceAlphaTestCode = `
+            // Fixed alpha test threshold (no distance-based adjustment)
+            float distanceAlphaTest = ${alphaTest.toFixed(3)};
+            `;
+              }
+
               fragmentCode = `
             #include <color_fragment>
             
-            // Distance-based alpha test: lower threshold at distance to prevent transparency issues
-            // Base alphaTest is 0.1, but we make it more permissive at distance
-            // At distance > 50 units, gradually reduce threshold to 0.0
-            float distanceAlphaTest = 0.1;
-            if (vDistance > 50.0) {
-              // Smoothly reduce alphaTest threshold from 0.1 to 0.0 as distance increases from 50 to 200
-              float distanceFactor = clamp((vDistance - 50.0) / 150.0, 0.0, 1.0);
-              distanceAlphaTest = mix(0.1, 0.0, distanceFactor);
+            ${distanceAlphaTestCode}
+            
+            // Edge bleed compensation: adjust edge color to fix white edge artifacts
+            // This compensates for transparency bleeding by darkening semi-transparent pixels
+            // Only apply if compensation factor is greater than 1.0
+            ${
+              edgeBleedCompensation > 1.0
+                ? `
+            float edgeFactor = smoothstep(0.0, 1.0 / ${edgeBleedCompensation.toFixed(
+              2
+            )}, diffuseColor.a);
+            diffuseColor.rgb *= mix(1.0, edgeFactor, 0.3);
+            `
+                : ""
+            }
+            
+            ${
+              premultiplyAlpha
+                ? `
+            // Premultiply alpha: fix white edges by premultiplying RGB with alpha
+            // This is critical for fixing white edge artifacts in PNG transparency
+            diffuseColor.rgb *= diffuseColor.a;
+            `
+                : ""
             }
             
             // Apply distance-based alpha test (replace standard alphaTest)
@@ -454,7 +537,14 @@ export const InstancedBillboardTrees = ({
           };
 
           console.log(
-            `   🍃 Leaves material: transparent=true, alphaTest=${material.alphaTest}, depthWrite=${material.depthWrite}, side=DoubleSide, viewThickening=${enableViewThickening}`
+            `   🍃 Leaves material: transparent=true, alphaTest=${material.alphaTest}, premultiplyAlpha=${material.premultipliedAlpha}, depthWrite=${material.depthWrite}, side=DoubleSide, viewThickening=${enableViewThickening}`
+          );
+          console.log(
+            `   🎨 Transparency controls: edgeBleedCompensation=${edgeBleedCompensation.toFixed(
+              2
+            )}, distanceAlphaTest=${
+              enableDistanceAlphaTest ? "enabled" : "disabled"
+            }`
           );
         }
 
@@ -570,10 +660,16 @@ export const InstancedBillboardTrees = ({
       instancedMeshesRef.current = instancedMeshes;
       materialsRef.current = instancedMeshes.map((mesh) => mesh.material);
 
-      // Store instance count for billboard rotation
+      // Store instance positions for billboard rotation
       instancePositionsRef.current = treeTransforms.map((t) =>
         t.position.clone()
       );
+
+      // Store original scales (CRITICAL: prevents drift - never extract from matrix!)
+      instanceScalesRef.current = treeTransforms.map((t) => t.scale);
+
+      // Initialize previous rotations (start with the random rotation from treeTransforms)
+      previousRotationsRef.current = treeTransforms.map((t) => t.rotation);
     };
 
     setupInstancedTrees();
@@ -591,6 +687,8 @@ export const InstancedBillboardTrees = ({
       instancedMeshesRef.current = [];
       materialsRef.current = [];
       instancePositionsRef.current = [];
+      instanceScalesRef.current = [];
+      previousRotationsRef.current = [];
       if (groupRef.current && groupRef.current.children.length === 0) {
         threeScene.remove(groupRef.current);
         groupRef.current = null;
@@ -629,17 +727,29 @@ export const InstancedBillboardTrees = ({
     lightDirectionX,
     lightDirectionY,
     lightDirectionZ,
+    alphaTest,
+    premultiplyAlpha,
+    edgeBleedCompensation,
+    enableDistanceAlphaTest,
+    distanceAlphaStart,
+    distanceAlphaEnd,
+    enableRotation,
+    rotationDampingDistance,
+    rotationStopDistance,
+    rotationThreshold,
+    rotationSmoothing,
     threeScene,
     gl,
     camera,
   ]);
 
-  // ========== BILLBOARD ROTATION: Update instances to face camera every frame ==========
+  // ========== BILLBOARD ROTATION: Update instances to face camera with realistic damping ==========
   useFrame(() => {
     if (
       !instancedMeshesRef.current.length ||
       !camera ||
-      instancePositionsRef.current.length === 0
+      instancePositionsRef.current.length === 0 ||
+      !enableRotation
     )
       return;
 
@@ -647,7 +757,14 @@ export const InstancedBillboardTrees = ({
     const cameraPosition = new THREE.Vector3();
     camera.getWorldPosition(cameraPosition);
 
-    // Update all instances to face camera
+    // Helper function to normalize angle differences (handle wrap-around)
+    const normalizeAngle = (angle) => {
+      while (angle > Math.PI) angle -= 2 * Math.PI;
+      while (angle < -Math.PI) angle += 2 * Math.PI;
+      return angle;
+    };
+
+    // Update all instances to face camera with distance-based damping
     instancedMeshesRef.current.forEach((instancedMesh) => {
       if (!instancedMesh) return;
 
@@ -657,33 +774,123 @@ export const InstancedBillboardTrees = ({
       );
 
       for (let i = 0; i < instanceCount; i++) {
-        // Get current matrix
-        const matrix = instancedMesh.getMatrixAt(i);
-
-        // Get stored instance position (more reliable than extracting from matrix)
+        // Get stored position FIRST (before any matrix operations)
         const instancePosition = instancePositionsRef.current[i];
         if (!instancePosition) continue;
 
-        // Calculate direction from instance to camera
+        // Calculate distance from stored position to camera
+        // Use stored position to avoid any matrix decomposition errors
+        const distance = cameraPosition.distanceTo(instancePosition);
+
+        // Get current rotation angle FIRST (before stop distance check)
+        let currentRotationAngle = previousRotationsRef.current[i];
+
+        // CLOSE DISTANCE: Freeze rotation completely when very close
+        if (distance < rotationStopDistance) {
+          // If angle not initialized, extract it ONCE from matrix to freeze it
+          if (currentRotationAngle === undefined) {
+            const matrix = instancedMesh.getMatrixAt(i);
+            const actualRotation = new THREE.Quaternion();
+            matrix.decompose(
+              new THREE.Vector3(),
+              actualRotation,
+              new THREE.Vector3()
+            );
+            const currentEuler = new THREE.Euler().setFromQuaternion(
+              actualRotation,
+              "YXZ"
+            );
+            currentRotationAngle = currentEuler.y;
+            previousRotationsRef.current[i] = currentRotationAngle;
+          }
+          // FREEZE: Don't update matrix, rotation stays locked at current angle
+          continue;
+        }
+
+        // Only NOW extract matrix when we're actually going to update rotation
+        const matrix = instancedMesh.getMatrixAt(i);
+        const actualPosition = new THREE.Vector3();
+        const actualScale = new THREE.Vector3();
+        const actualRotation = new THREE.Quaternion();
+        matrix.decompose(actualPosition, actualRotation, actualScale);
+
+        // Initialize rotation angle if not set
+        if (currentRotationAngle === undefined) {
+          const currentEuler = new THREE.Euler().setFromQuaternion(
+            actualRotation,
+            "YXZ"
+          );
+          currentRotationAngle = currentEuler.y;
+          previousRotationsRef.current[i] = currentRotationAngle;
+        }
+
+        // Calculate target angle to face camera (use stored position for consistency)
         const direction = new THREE.Vector3()
           .subVectors(cameraPosition, instancePosition)
           .normalize();
+        const targetAngle = Math.atan2(direction.x, direction.z);
 
-        // Calculate Y-axis rotation to face camera (horizontal billboard)
-        // Use atan2 to get angle in XZ plane
-        const angle = Math.atan2(direction.x, direction.z);
+        // Get previous rotation angle
+        const previousAngle = previousRotationsRef.current[i];
 
-        // Extract scale from original matrix
-        const scale = new THREE.Vector3();
-        matrix.decompose(new THREE.Vector3(), new THREE.Quaternion(), scale);
+        // Calculate angle difference (normalized to handle wrap-around)
+        let angleDiff = normalizeAngle(targetAngle - previousAngle);
 
-        // Create rotation quaternion (Y-axis only for horizontal billboard)
-        const rotation = new THREE.Quaternion();
-        rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+        // ROTATION THRESHOLD: Only rotate if angle change exceeds threshold (dead zone)
+        if (Math.abs(angleDiff) < rotationThreshold) {
+          // Angle change too small - don't update matrix at all
+          // Leave it exactly as-is to prevent any shifting
+          continue;
+        }
 
-        // Create new matrix with position, rotation, and scale
-        const newMatrix = new THREE.Matrix4();
-        newMatrix.compose(instancePosition, rotation, scale);
+        // DISTANCE-BASED ROTATION DAMPING: Reduce rotation sensitivity when close
+        let rotationFactor = 1.0; // Full rotation at far distances
+        if (distance < rotationDampingDistance) {
+          // Linearly interpolate rotation factor from 1.0 (at dampingDistance) to 0.0 (at stopDistance)
+          const dampingRange = rotationDampingDistance - rotationStopDistance;
+          if (dampingRange > 0) {
+            const distanceInRange = distance - rotationStopDistance;
+            rotationFactor = Math.max(
+              0.0,
+              Math.min(1.0, distanceInRange / dampingRange)
+            );
+          }
+        }
+
+        // Apply damping to angle difference
+        const dampedAngleDiff = angleDiff * rotationFactor;
+        const targetAngleWithDamping = previousAngle + dampedAngleDiff;
+
+        // ROTATION SMOOTHING: Proper lerp between previous and target angle
+        // rotationSmoothing: 0 = instant (no smoothing), 1 = very slow
+        // Lower values = faster rotation, higher values = slower/smoother
+        // Calculate how much to move towards target this frame
+        const angleToMove = normalizeAngle(
+          targetAngleWithDamping - previousAngle
+        );
+        const smoothedAngle =
+          previousAngle + angleToMove * (1.0 - rotationSmoothing);
+
+        // Store smoothed angle for next frame
+        previousRotationsRef.current[i] = smoothedAngle;
+
+        // CRITICAL FIX: Use compose() which handles rotation around pivot correctly
+        // compose() creates matrix as: T * R * S (translate, rotate, scale)
+        // This ensures rotation happens around the geometry's origin (0,0,0) in local space
+        // The position is applied AFTER rotation, so position never changes
+        const instanceScale = instanceScalesRef.current[i];
+        if (instanceScale === undefined) continue;
+
+        // CRITICAL: Use Object3D.updateMatrix() - EXACT same method as initial setup
+        // This guarantees the matrix is built identically, preventing any position shifting
+        const tempObject = new THREE.Object3D();
+        tempObject.position.copy(instancePosition);
+        tempObject.rotation.y = smoothedAngle; // Same as obj.rotateY() in initial setup
+        tempObject.scale.setScalar(instanceScale); // Same as obj.scale.setScalar()
+        tempObject.updateMatrix(); // This builds matrix EXACTLY like initial setup
+
+        // Clone the matrix - guaranteed to match Three.js format
+        const newMatrix = tempObject.matrix.clone();
 
         // Set the updated matrix
         instancedMesh.setMatrixAt(i, newMatrix);

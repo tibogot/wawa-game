@@ -109,16 +109,25 @@ const leavesFS = /*glsl*/ `
 
     float getDiffuse(){
 
-        float intensity;
+        float intensity = 0.0;
 
-        for (int i = 0; i < directionalLights.length(); i++){
-
-            intensity = dot(directionalLights[i].direction, vNormal);
-
+        int numLights = directionalLights.length();
+        
+        if (numLights > 0) {
+            // Handle first light
+            intensity = dot(directionalLights[0].direction, vNormal);
             intensity = smoothstep(0.55, 1., intensity) * 0.2 
-
                         + pow(smoothstep(0.55, 1., intensity), 0.5);
-
+            
+            // Handle additional lights if there are 2 or more
+            if (numLights > 1) {
+                for (int i = 1; i < numLights; i++){
+                    float lightIntensity = dot(directionalLights[i].direction, vNormal);
+                    lightIntensity = smoothstep(0.55, 1., lightIntensity) * 0.2 
+                                    + pow(smoothstep(0.55, 1., lightIntensity), 0.5);
+                    intensity = max(intensity, lightIntensity);
+                }
+            }
         }
 
         return intensity;

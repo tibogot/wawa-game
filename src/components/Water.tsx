@@ -16,6 +16,13 @@ interface WaterProps {
   flatShading?: boolean;
   size?: number;
   segments?: number;
+  waterOffset?: number;
+  waterContrast?: number;
+  waterTimeSpeed?: number;
+  waterHeight?: number;
+  waterWaveAmplitude?: number;
+  waterWaveFrequency?: number;
+  position?: [number, number, number];
 }
 
 export default function Water({
@@ -26,8 +33,15 @@ export default function Water({
   flatShading = false,
   size = 5,
   segments = 64,
+  waterOffset = 0.4,
+  waterContrast = 3.1,
+  waterTimeSpeed = 5,
+  waterHeight = 0.2,
+  waterWaveAmplitude = 1.0,
+  waterWaveFrequency = 1.0,
+  position = [0, 0, 0],
 }: WaterProps) {
-  const thickness = 0.2;
+  const thickness = waterHeight;
   const material = useRef<CustomShaderMaterialType | null>(null);
 
   // Determine which properties are supported by the base material
@@ -76,7 +90,8 @@ export default function Water({
 
   useFrame((state) => {
     if (material?.current) {
-      material.current.uniforms.uTime.value = -state.clock.elapsedTime / 5;
+      material.current.uniforms.uTime.value =
+        -state.clock.elapsedTime / waterTimeSpeed;
     }
   });
 
@@ -90,11 +105,25 @@ export default function Water({
         waterHighlightColor
       ).convertLinearToSRGB();
       material.current.uniforms.brightness.value = waterBrightness * 2;
+      material.current.uniforms.offset.value = waterOffset;
+      material.current.uniforms.contrast.value = waterContrast;
+      material.current.uniforms.uHeight.value = waterHeight;
+      material.current.uniforms.waveAmplitude.value = waterWaveAmplitude;
+      material.current.uniforms.waveFrequency.value = waterWaveFrequency;
     }
-  }, [waterColor, waterHighlightColor, waterBrightness]);
+  }, [
+    waterColor,
+    waterHighlightColor,
+    waterBrightness,
+    waterOffset,
+    waterContrast,
+    waterHeight,
+    waterWaveAmplitude,
+    waterWaveFrequency,
+  ]);
 
   return (
-    <group>
+    <group position={position}>
       <mesh castShadow receiveShadow rotation-x={-Math.PI / 2}>
         <boxGeometry args={[size, size, thickness, segments, segments, 1]} />
         <CustomShaderMaterial
@@ -112,16 +141,22 @@ export default function Water({
               value: new THREE.Color(waterHighlightColor).convertLinearToSRGB(),
             },
             offset: {
-              value: 0.4,
+              value: waterOffset,
             },
             contrast: {
-              value: 3.1,
+              value: waterContrast,
             },
             brightness: {
               value: waterBrightness * 2,
             },
             uHeight: {
-              value: thickness,
+              value: waterHeight,
+            },
+            waveAmplitude: {
+              value: waterWaveAmplitude,
+            },
+            waveFrequency: {
+              value: waterWaveFrequency,
             },
           }}
         />

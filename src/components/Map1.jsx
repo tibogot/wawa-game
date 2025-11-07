@@ -40,11 +40,15 @@ import { InstancedBillboardTrees } from "./InstancedBillboardTrees";
 import { InstancedPines } from "./InstancedPines";
 import { AnimatedTree } from "./AnimatedTree";
 import { AnimatedTree2 } from "./AnimatedTree2";
+import { AnimatedTree3 } from "./AnimatedTree3";
 import { useAnimatedTree2Controls } from "./useAnimatedTree2Controls";
+import { useAnimatedTree3Controls } from "./useAnimatedTree3Controls";
 import { useInstancedAnimatedTreesControls } from "./useInstancedAnimatedTreesControls";
 import { InstancedAnimatedTrees } from "./InstancedAnimatedTrees";
 import Water from "./Water";
 import Ice from "./Ice";
+import Forest from "./ManciniForest";
+import { useWaterControls } from "./useWaterControls";
 import * as THREE from "three";
 import {
   MeshBasicMaterial,
@@ -300,6 +304,25 @@ export const Map1 = ({
     animatedTree2PoleTexturePath,
   } = useAnimatedTree2Controls();
 
+  // Get AnimatedTree3 controls
+  const {
+    animatedTree3Enabled,
+    animatedTree3PositionX,
+    animatedTree3PositionY,
+    animatedTree3PositionZ,
+    animatedTree3Scale,
+    animatedTree3CastShadow,
+    animatedTree3ReceiveShadow,
+    animatedTree3ColorA,
+    animatedTree3ColorB,
+    animatedTree3ColorC,
+    animatedTree3GradientThreshold,
+    animatedTree3GradientPower,
+    animatedTree3ModelPath,
+    animatedTree3NoiseTexturePath,
+    animatedTree3PoleTexturePath,
+  } = useAnimatedTree3Controls();
+
   // Get InstancedTrees controls
   const {
     instancedTreesEnabled,
@@ -355,6 +378,17 @@ export const Map1 = ({
     billboardLightDirectionX,
     billboardLightDirectionY,
     billboardLightDirectionZ,
+    billboardEnableRotation,
+    billboardRotationDampingDistance,
+    billboardRotationStopDistance,
+    billboardRotationThreshold,
+    billboardRotationSmoothing,
+    billboardAlphaTest,
+    billboardPremultiplyAlpha,
+    billboardEdgeBleedCompensation,
+    billboardDistanceAlphaTest,
+    billboardDistanceAlphaStart,
+    billboardDistanceAlphaEnd,
   } = useInstancedBillboardTreesControls();
 
   // Get InstancedPines controls
@@ -413,7 +447,25 @@ export const Map1 = ({
     flareDistance,
   } = useLensFlareControls();
 
-  // Get FlowingLines, RipplePlane, Water, and Ice controls - Map1 specific
+  // Get Water controls
+  const {
+    waterEnabled,
+    waterBaseMaterial,
+    waterColor,
+    waterHighlightColor,
+    waterBrightness,
+    waterFlatshading,
+    waterSize,
+    waterSegments,
+    waterOffset,
+    waterContrast,
+    waterTimeSpeed,
+    waterHeight,
+    waterWaveAmplitude,
+    waterWaveFrequency,
+  } = useWaterControls();
+
+  // Get FlowingLines, RipplePlane, Ice, and Forest controls - Map1 specific
   const {
     skyboxEnabled,
     flowingLinesEnabled,
@@ -429,14 +481,13 @@ export const Map1 = ({
     ripplePlanePositionX,
     ripplePlanePositionY,
     ripplePlanePositionZ,
-    waterEnabled,
-    waterBaseMaterial,
-    waterColor,
-    waterHighlightColor,
-    waterBrightness,
-    waterFlatshading,
-    waterSize,
-    waterSegments,
+    forestEnabled,
+    forestNumTrees,
+    forestInnerRadius,
+    forestOuterRadius,
+    forestPositionX,
+    forestPositionY,
+    forestPositionZ,
     iceEnabled,
     iceBaseMaterial,
     iceColor,
@@ -552,59 +603,53 @@ export const Map1 = ({
       },
       { collapsed: true }
     ),
-    water: folder(
+    forest: folder(
       {
-        waterEnabled: {
+        forestEnabled: {
           value: false,
-          label: "🌊 Enable Water",
+          label: "🌲 Enable Forest",
         },
-        waterBaseMaterial: {
-          options: {
-            MeshPhysicalMaterial,
-            MeshBasicMaterial,
-            MeshMatcapMaterial,
-            MeshNormalMaterial,
-            MeshStandardMaterial,
-            MeshPhongMaterial,
-            MeshToonMaterial,
-            MeshLambertMaterial,
-            MeshDepthMaterial,
-          },
-          value: MeshPhysicalMaterial,
-          label: "📦 Base Material",
+        forestNumTrees: {
+          value: 100,
+          min: 10,
+          max: 500,
+          step: 10,
+          label: "🌳 Number of Trees",
         },
-        waterColor: {
-          value: "#52a7f7",
-          label: "🎨 Water Color",
-        },
-        waterHighlightColor: {
-          value: "#b3ffff",
-          label: "✨ Highlight Color",
-        },
-        waterBrightness: {
-          value: 0.5,
+        forestInnerRadius: {
+          value: 10,
           min: 0,
-          max: 1,
-          step: 0.01,
-          label: "💡 Brightness",
-        },
-        waterFlatshading: {
-          value: false,
-          label: "🔲 Flat Shading",
-        },
-        waterSize: {
-          value: 5,
-          min: 1,
           max: 100,
           step: 1,
-          label: "📐 Size",
+          label: "📐 Inner Radius",
         },
-        waterSegments: {
-          value: 64,
-          min: 16,
-          max: 512,
-          step: 8,
-          label: "🔲 Segments",
+        forestOuterRadius: {
+          value: 50,
+          min: 1,
+          max: 200,
+          step: 1,
+          label: "📐 Outer Radius",
+        },
+        forestPositionX: {
+          value: 0,
+          min: -100,
+          max: 100,
+          step: 1,
+          label: "📍 Position X",
+        },
+        forestPositionY: {
+          value: 0,
+          min: -10,
+          max: 10,
+          step: 0.1,
+          label: "📍 Position Y",
+        },
+        forestPositionZ: {
+          value: 0,
+          min: -100,
+          max: 100,
+          step: 1,
+          label: "📍 Position Z",
         },
       },
       { collapsed: true }
@@ -1050,6 +1095,12 @@ export const Map1 = ({
           flatShading={waterFlatshading}
           size={waterSize}
           segments={waterSegments}
+          waterOffset={waterOffset}
+          waterContrast={waterContrast}
+          waterTimeSpeed={waterTimeSpeed}
+          waterHeight={waterHeight}
+          waterWaveAmplitude={waterWaveAmplitude}
+          waterWaveFrequency={waterWaveFrequency}
         />
       )}
 
@@ -1068,6 +1119,17 @@ export const Map1 = ({
           flatShading={iceFlatshading}
           size={iceSize}
           segments={iceSegments}
+        />
+      )}
+
+      {/* Forest - ManciniForest billboard trees */}
+      {forestEnabled && (
+        <Forest
+          numTrees={forestNumTrees}
+          innerRadius={forestInnerRadius}
+          outerRadius={forestOuterRadius}
+          position={[forestPositionX, forestPositionY, forestPositionZ]}
+          getTerrainHeight={getGroundHeight}
         />
       )}
 
@@ -1140,6 +1202,28 @@ export const Map1 = ({
         />
       )}
 
+      {/* Animated Tree 3 - Interactive tree with full controls */}
+      {animatedTree3Enabled && (
+        <AnimatedTree3
+          position={[
+            animatedTree3PositionX,
+            animatedTree3PositionY,
+            animatedTree3PositionZ,
+          ]}
+          scale={animatedTree3Scale}
+          castShadow={animatedTree3CastShadow}
+          receiveShadow={animatedTree3ReceiveShadow}
+          colorA={animatedTree3ColorA}
+          colorB={animatedTree3ColorB}
+          colorC={animatedTree3ColorC}
+          gradientThreshold={animatedTree3GradientThreshold}
+          gradientPower={animatedTree3GradientPower}
+          treeModelPath={animatedTree3ModelPath}
+          noiseTexturePath={animatedTree3NoiseTexturePath}
+          poleTexturePath={animatedTree3PoleTexturePath}
+        />
+      )}
+
       {/* Instanced Trees - Using InstancedMesh2 */}
       {instancedTreesEnabled && (
         <InstancedTrees
@@ -1199,6 +1283,17 @@ export const Map1 = ({
           lightDirectionX={billboardLightDirectionX}
           lightDirectionY={billboardLightDirectionY}
           lightDirectionZ={billboardLightDirectionZ}
+          enableRotation={billboardEnableRotation}
+          rotationDampingDistance={billboardRotationDampingDistance}
+          rotationStopDistance={billboardRotationStopDistance}
+          rotationThreshold={billboardRotationThreshold}
+          rotationSmoothing={billboardRotationSmoothing}
+          alphaTest={billboardAlphaTest}
+          premultiplyAlpha={billboardPremultiplyAlpha}
+          edgeBleedCompensation={billboardEdgeBleedCompensation}
+          enableDistanceAlphaTest={billboardDistanceAlphaTest}
+          distanceAlphaStart={billboardDistanceAlphaStart}
+          distanceAlphaEnd={billboardDistanceAlphaEnd}
         />
       )}
 

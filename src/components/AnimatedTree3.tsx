@@ -1,18 +1,12 @@
-import React, {
-  useRef,
-  useMemo,
-  useEffect,
-  useState,
-  useCallback,
-} from "react";
-import { useFrame, useThree } from "@react-three/fiber";
+import React, { useRef, useMemo, useEffect, useState } from "react";
+import { useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 
 const leavesVS = /*glsl*/ `
       uniform sampler2D uNoiseMap;
   
-      uniform vec3 uBoxMin, uBoxSize, uRaycast;
+      uniform vec3 uBoxMin, uBoxSize;
   
       uniform float uTime;
   
@@ -42,8 +36,6 @@ const leavesVS = /*glsl*/ `
   
       void main(){
   
-          mat4 mouseDisplace = mat4(1.);
-  
           // Get position in instance space (before modelMatrix transform)
           // This is in the same coordinate space as uBoxMin
           vec3 instancePos = vec3(instanceMatrix * vec4(position, 1.));
@@ -53,7 +45,7 @@ const leavesVS = /*glsl*/ `
           vObjectPos = ((instancePos - uBoxMin) * 2.) / uBoxSize - vec3(1.0);
           
           // Now calculate world position for other calculations
-          vec3 vWorldPos = vec3(modelMatrix * instanceMatrix * mouseDisplace * vec4(position, 1.));
+          vec3 vWorldPos = vec3(modelMatrix * instanceMatrix * vec4(position, 1.));
   
           // Calculate close to ground relative to tree's bounding box (not absolute world Y)
           // This makes it work regardless of terrain height
@@ -63,19 +55,16 @@ const leavesVS = /*glsl*/ `
           // Then invert so lower leaves have higher value (closer to ground)
           vCloseToGround = clamp(1.0 - (leafHeightRelativeToTree / max(treeHeight, 0.001)), 0.0, 1.0);
   
-          float offset = clamp(0.8 - distance(uRaycast, instanceMatrix[3].xyz), 0., 999.); 
+          // TODO: Add wind displacement here later
+          // For now, no displacement from mouse or wind
   
-          offset = (pow(offset, 0.8) / 2.0) * vCloseToGround;
+          vNormal = normalMatrix * mat3(instanceMatrix) * normalize(normal); 
   
-          mouseDisplace[3].xyz = vec3(offset);
-  
-          vNormal = normalMatrix * mat3(instanceMatrix) * mat3(mouseDisplace) * normalize(normal); 
-  
-          vWorldNormal = vec3(modelMatrix * instanceMatrix * mouseDisplace * vec4(normal, 0.)); 
+          vWorldNormal = vec3(modelMatrix * instanceMatrix * vec4(normal, 0.)); 
   
           vec4 noiseOffset = getTriplanar(uNoiseMap) * vCloseToGround; 
   
-          vec4 newPos = instanceMatrix * mouseDisplace * vec4(position, 1.); 
+          vec4 newPos = instanceMatrix * vec4(position, 1.); 
   
           newPos.xyz = newPos.xyz + noiseOffset.xyz;
   
@@ -175,13 +164,12 @@ const leavesFS = /*glsl*/ `
       }
   `;
 
-interface AnimatedTree2Props {
+interface AnimatedTree3Props {
   treeModelPath?: string;
   noiseTexturePath?: string;
   poleTexturePath?: string;
   position?: [number, number, number];
   scale?: number;
-  enableMouseInteraction?: boolean;
   colorA?: string | THREE.Color;
   colorB?: string | THREE.Color;
   colorC?: string | THREE.Color;
@@ -191,13 +179,12 @@ interface AnimatedTree2Props {
   receiveShadow?: boolean;
 }
 
-export const AnimatedTree2: React.FC<AnimatedTree2Props> = ({
+export const AnimatedTree3: React.FC<AnimatedTree3Props> = ({
   treeModelPath = "https://raw.githubusercontent.com/ceramicSoda/treeshader/main/assets/tree.glb",
   noiseTexturePath = "https://raw.githubusercontent.com/ceramicSoda/treeshader/main/assets/noise.png",
   poleTexturePath = "https://raw.githubusercontent.com/ceramicSoda/treeshader/main/assets/texture.jpg",
   position = [0, 0, 0],
   scale = 1,
-  enableMouseInteraction = true,
   colorA = "#b45252",
   colorB = "#d3a068",
   colorC = "#ede19e",
@@ -208,14 +195,6 @@ export const AnimatedTree2: React.FC<AnimatedTree2Props> = ({
 }) => {
   const groupRef = useRef<THREE.Group>(null);
   const leavesRef = useRef<THREE.InstancedMesh>(null);
-  const rayPlaneRef = useRef<THREE.Mesh>(null);
-  const { camera, raycaster, size } = useThree();
-
-  // Memoize ray plane geometry
-  const rayPlaneGeometry = useMemo(
-    () => new THREE.PlaneGeometry(100, 100, 1, 1),
-    []
-  );
 
   // Load GLTF model
   const gltf = useGLTF(treeModelPath);
@@ -352,7 +331,6 @@ export const AnimatedTree2: React.FC<AnimatedTree2Props> = ({
         uColorC: { value: colorCValue },
         uBoxMin: { value: new THREE.Vector3(0, 0, 0) },
         uBoxSize: { value: new THREE.Vector3(10, 10, 10) },
-        uRaycast: { value: new THREE.Vector3(0, 0, 0) },
         uNoiseMap: { value: noiseTexture },
         uGradientThreshold: { value: gradientThreshold },
         uGradientPower: { value: gradientPower },
@@ -460,9 +438,9 @@ export const AnimatedTree2: React.FC<AnimatedTree2Props> = ({
     setDeadID(initialDead);
   }, [treeData]);
 
-  // Random leaf killing
+  // Random leaf killing (no mouse interaction needed)
   useEffect(() => {
-    if (!treeData || !enableMouseInteraction) return;
+    if (!treeData) return;
 
     const killRandom = () => {
       setDeadID((prev) => {
@@ -475,53 +453,7 @@ export const AnimatedTree2: React.FC<AnimatedTree2Props> = ({
 
     const timeout = setTimeout(killRandom, Math.random() * 1500);
     return () => clearTimeout(timeout);
-  }, [treeData, enableMouseInteraction]);
-
-  // Pointer move handler
-  const handlePointerMove = useCallback(
-    (event: any) => {
-      if (!leavesMesh || !rayPlaneRef.current || !enableMouseInteraction)
-        return;
-
-      // Update pointer from event
-      const x = (event.clientX / size.width) * 2 - 1;
-      const y = -(event.clientY / size.height) * 2 + 1;
-
-      raycaster.setFromCamera(new THREE.Vector2(x, y), camera);
-
-      const rayPlane = rayPlaneRef.current;
-      const intersects = raycaster.intersectObjects([leavesMesh, rayPlane]);
-
-      if (intersects[0]) {
-        // For smooth transition between background and tree
-        rayPlane.position.copy(intersects[0].point);
-        rayPlane.position.multiplyScalar(0.9);
-        rayPlane.lookAt(camera.position);
-
-        if (leavesMaterial) {
-          leavesMaterial.uniforms.uRaycast.value.copy(intersects[0].point);
-        }
-
-        if (Math.random() * 5 > 3 && intersects[0].instanceId !== undefined) {
-          setDeadID((prev) => {
-            const newDead = [...prev];
-            if (!newDead.includes(intersects[0].instanceId!)) {
-              newDead.push(intersects[0].instanceId!);
-            }
-            return newDead;
-          });
-        }
-      }
-    },
-    [
-      leavesMesh,
-      leavesMaterial,
-      camera,
-      raycaster,
-      size,
-      enableMouseInteraction,
-    ]
-  );
+  }, [treeData]);
 
   // Animation loop
   const timeRef = useRef(0);
@@ -580,15 +512,6 @@ export const AnimatedTree2: React.FC<AnimatedTree2Props> = ({
     }
   });
 
-  // Set up pointer event
-  useEffect(() => {
-    if (!enableMouseInteraction) return;
-
-    const handleMove = (e: MouseEvent) => handlePointerMove(e);
-    window.addEventListener("mousemove", handleMove);
-    return () => window.removeEventListener("mousemove", handleMove);
-  }, [handlePointerMove, enableMouseInteraction]);
-
   if (!treeData || !leavesMesh || !leavesMaterial) {
     return null;
   }
@@ -597,7 +520,6 @@ export const AnimatedTree2: React.FC<AnimatedTree2Props> = ({
     <group ref={groupRef} position={position} scale={scale}>
       <primitive object={treeData.pole} />
       <primitive object={leavesMesh} ref={leavesRef} />
-      <mesh ref={rayPlaneRef} geometry={rayPlaneGeometry} visible={false} />
     </group>
   );
 };

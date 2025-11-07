@@ -61,6 +61,9 @@ import { useInstancedPinesControls } from "./useInstancedPinesControls";
 import { AnimatedTree2 } from "./AnimatedTree2";
 import { useAnimatedTree2Controls } from "./useAnimatedTree2Controls";
 import { PhysicsDebugCubes } from "./PhysicsDebugCubes";
+import Forest from "./ManciniForest";
+import Water from "./Water";
+import { useWaterControls } from "./useWaterControls";
 // import { Lake } from "./Lake";
 
 export const Map9 = forwardRef(
@@ -471,6 +474,17 @@ export const Map9 = forwardRef(
       billboardLightDirectionX,
       billboardLightDirectionY,
       billboardLightDirectionZ,
+      billboardEnableRotation,
+      billboardRotationDampingDistance,
+      billboardRotationStopDistance,
+      billboardRotationThreshold,
+      billboardRotationSmoothing,
+      billboardAlphaTest,
+      billboardPremultiplyAlpha,
+      billboardEdgeBleedCompensation,
+      billboardDistanceAlphaTest,
+      billboardDistanceAlphaStart,
+      billboardDistanceAlphaEnd,
     } = useInstancedBillboardTreesControls();
 
     // Get AnimatedTree2 controls
@@ -492,6 +506,27 @@ export const Map9 = forwardRef(
       animatedTree2NoiseTexturePath,
       animatedTree2PoleTexturePath,
     } = useAnimatedTree2Controls();
+
+    // Get Water controls
+    const {
+      waterEnabled,
+      waterBaseMaterial,
+      waterColor,
+      waterHighlightColor,
+      waterBrightness,
+      waterFlatshading,
+      waterSize,
+      waterSegments,
+      waterOffset,
+      waterContrast,
+      waterTimeSpeed,
+      waterHeight,
+      waterWaveAmplitude,
+      waterWaveFrequency,
+      waterPositionX,
+      waterPositionY,
+      waterPositionZ,
+    } = useWaterControls();
 
     // Get FallingLeaves controls
     const {
@@ -602,6 +637,69 @@ export const Map9 = forwardRef(
           { collapsed: true }
         ),
       });
+
+    // Get Forest controls
+    const {
+      forestEnabled,
+      forestNumTrees,
+      forestInnerRadius,
+      forestOuterRadius,
+      forestPositionX,
+      forestPositionY,
+      forestPositionZ,
+    } = useControls("🗺️ MAP 9", {
+      forest: folder(
+        {
+          forestEnabled: {
+            value: false,
+            label: "🌲 Enable Forest",
+          },
+          forestNumTrees: {
+            value: 100,
+            min: 10,
+            max: 500,
+            step: 10,
+            label: "🌳 Number of Trees",
+          },
+          forestInnerRadius: {
+            value: 10,
+            min: 0,
+            max: 1000,
+            step: 10,
+            label: "📐 Inner Radius",
+          },
+          forestOuterRadius: {
+            value: 50,
+            min: 1,
+            max: 1500,
+            step: 10,
+            label: "📐 Outer Radius",
+          },
+          forestPositionX: {
+            value: 0,
+            min: -1250,
+            max: 1250,
+            step: 10,
+            label: "📍 Position X",
+          },
+          forestPositionY: {
+            value: 0,
+            min: -100,
+            max: 100,
+            step: 1,
+            label: "📍 Position Y",
+          },
+          forestPositionZ: {
+            value: 0,
+            min: -1250,
+            max: 1250,
+            step: 10,
+            label: "📍 Position Z",
+          },
+        },
+        { collapsed: true }
+      ),
+    });
 
     // Create stable fallback vectors
     const fallbackPosition = useMemo(() => new THREE.Vector3(0, 0, 0), []);
@@ -806,6 +904,12 @@ export const Map9 = forwardRef(
         `Map9 - AdBillboard at [${adBillboardPosition[0]}, ${adBillboardPosition[2]}] -> terrain height: ${adBillboardTerrainHeight}`
       );
     }
+
+    // Calculate terrain height for Water position
+    const waterTerrainHeight =
+      waterEnabled && heightmapLookup
+        ? getGroundHeight(waterPositionX, waterPositionZ) + waterPositionY
+        : waterPositionY;
 
     return (
       <group ref={group} {...props}>
@@ -1409,6 +1513,48 @@ export const Map9 = forwardRef(
             lightDirectionX={billboardLightDirectionX}
             lightDirectionY={billboardLightDirectionY}
             lightDirectionZ={billboardLightDirectionZ}
+            enableRotation={billboardEnableRotation}
+            rotationDampingDistance={billboardRotationDampingDistance}
+            rotationStopDistance={billboardRotationStopDistance}
+            rotationThreshold={billboardRotationThreshold}
+            rotationSmoothing={billboardRotationSmoothing}
+            alphaTest={billboardAlphaTest}
+            premultiplyAlpha={billboardPremultiplyAlpha}
+            edgeBleedCompensation={billboardEdgeBleedCompensation}
+            enableDistanceAlphaTest={billboardDistanceAlphaTest}
+            distanceAlphaStart={billboardDistanceAlphaStart}
+            distanceAlphaEnd={billboardDistanceAlphaEnd}
+          />
+        )}
+
+        {/* Forest - ManciniForest billboard trees */}
+        {forestEnabled && heightmapLookup && (
+          <Forest
+            numTrees={forestNumTrees}
+            innerRadius={forestInnerRadius}
+            outerRadius={forestOuterRadius}
+            position={[forestPositionX, forestPositionY, forestPositionZ]}
+            getTerrainHeight={getGroundHeight}
+          />
+        )}
+
+        {/* Water - Shader-based water surface */}
+        {waterEnabled && (
+          <Water
+            base={waterBaseMaterial}
+            waterColor={waterColor}
+            waterHighlightColor={waterHighlightColor}
+            waterBrightness={waterBrightness}
+            flatShading={waterFlatshading}
+            size={waterSize}
+            segments={waterSegments}
+            waterOffset={waterOffset}
+            waterContrast={waterContrast}
+            waterTimeSpeed={waterTimeSpeed}
+            waterHeight={waterHeight}
+            waterWaveAmplitude={waterWaveAmplitude}
+            waterWaveFrequency={waterWaveFrequency}
+            position={[waterPositionX, waterTerrainHeight, waterPositionZ]}
           />
         )}
 

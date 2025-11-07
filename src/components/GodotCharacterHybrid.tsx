@@ -140,9 +140,11 @@ export const GodotCharacterHybrid = ({
   const crouchTransitioningRef = useRef(false);
   const ceilingClearanceTimer = useRef(0);
 
-  // Mouse orbit for follow-orbit camera mode
-  const mouseOrbitOffset = useRef(0); // Horizontal orbit offset (0 = default behind character)
-  const mouseVerticalOffset = useRef(0); // Vertical orbit offset (0 = default height)
+  // Mouse orbit for follow-orbit camera mode (delta-based)
+  const mouseOrbitOffset = useRef(0); // Horizontal orbit offset (accumulated from mouse movement deltas)
+  const mouseVerticalOffset = useRef(0); // Vertical orbit offset (accumulated from mouse movement deltas)
+  const isPointerLocked = useRef(false);
+  const pointerLockElementRef = useRef<HTMLElement | null>(null);
 
   // BVH temps
   const tempBox = useRef(new Box3());
@@ -202,36 +204,63 @@ export const GodotCharacterHybrid = ({
     };
   }, [combatMode]);
 
-  // Mouse orbit controls for follow-orbit camera mode
+  // Mouse orbit controls for follow-orbit camera mode (delta-based with pointer lock)
   useEffect(() => {
     if (cameraMode !== "follow-orbit") {
+      // Unlock pointer and reset if exiting follow-orbit mode
+      if (isPointerLocked.current && document.pointerLockElement) {
+        document.exitPointerLock();
+      }
       return;
     }
 
+    // Get canvas element for pointer lock (React Three Fiber canvas)
+    const canvas = document.querySelector("canvas");
+    if (!canvas) {
+      console.warn("Canvas not found for pointer lock");
+      return;
+    }
+    pointerLockElementRef.current = canvas;
+
     // Reset offsets when entering follow-orbit mode
-    // Screen center always = camera behind character (0 offset)
     mouseOrbitOffset.current = 0;
     mouseVerticalOffset.current = 0;
 
+    // Request pointer lock on click (required for security)
+    const requestPointerLock = () => {
+      if (canvas && !isPointerLocked.current) {
+        canvas.requestPointerLock().catch((err) => {
+          console.warn("Pointer lock failed:", err);
+        });
+      }
+    };
+
+    // Handle pointer lock state changes
+    const handlePointerLockChange = () => {
+      isPointerLocked.current = document.pointerLockElement === canvas;
+
+      // Hide cursor when locked
+      if (isPointerLocked.current) {
+        document.body.style.cursor = "none";
+      } else {
+        document.body.style.cursor = "auto";
+      }
+    };
+
+    // Handle mouse movement (delta-based)
     const handleMouseMove = (e: MouseEvent) => {
-      if (cameraMode !== "follow-orbit") return;
+      if (cameraMode !== "follow-orbit" || !isPointerLocked.current) return;
 
-      // Always use screen center as the reference point
-      // CURSOR CENTER = camera at back of character (0 offset)
-      const screenCenterX = window.innerWidth / 2;
-      const screenCenterY = window.innerHeight / 2;
+      // Use movementX and movementY (delta values) instead of absolute position
+      // These represent how much the mouse moved since the last event
+      const deltaX = e.movementX || 0;
+      const deltaY = e.movementY || 0;
 
-      // Calculate mouse position relative to SCREEN CENTER
-      // Screen center = behind character (0 offset)
-      // Mouse right of screen center = positive offset = camera orbits right
-      // Mouse left of screen center = negative offset = camera orbits left
-      const mouseXRelativeToCenter = e.clientX - screenCenterX;
-      const mouseYRelativeToCenter = e.clientY - screenCenterY;
+      // Accumulate horizontal orbit offset (inverted: right movement = left orbit)
+      mouseOrbitOffset.current -= deltaX * mouseSensitivity;
 
-      // Convert screen position relative to center to camera orbit offset
-      // Screen center (mouseXRelativeToCenter = 0) = camera behind (0 offset)
-      mouseOrbitOffset.current = mouseXRelativeToCenter * mouseSensitivity;
-      mouseVerticalOffset.current = -mouseYRelativeToCenter * mouseSensitivity;
+      // Accumulate vertical orbit offset (inverted: up movement = camera looks up)
+      mouseVerticalOffset.current -= deltaY * mouseSensitivity;
 
       // Clamp vertical offset to prevent camera from going too high/low
       mouseVerticalOffset.current = MathUtils.clamp(
@@ -241,10 +270,41 @@ export const GodotCharacterHybrid = ({
       );
     };
 
-    window.addEventListener("mousemove", handleMouseMove);
+    // Request pointer lock on click
+    canvas.addEventListener("click", requestPointerLock);
+
+    // Listen for pointer lock state changes
+    document.addEventListener("pointerlockchange", handlePointerLockChange);
+    document.addEventListener("pointerlockerror", () => {
+      console.warn("Pointer lock error");
+      isPointerLocked.current = false;
+      document.body.style.cursor = "auto";
+    });
+
+    // Listen for mouse movement (only works when pointer is locked)
+    document.addEventListener("mousemove", handleMouseMove);
+
+    // Auto-request pointer lock if not already locked
+    if (!isPointerLocked.current) {
+      // Small delay to ensure canvas is ready
+      setTimeout(() => {
+        requestPointerLock();
+      }, 100);
+    }
 
     return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
+      canvas.removeEventListener("click", requestPointerLock);
+      document.removeEventListener(
+        "pointerlockchange",
+        handlePointerLockChange
+      );
+      document.removeEventListener("mousemove", handleMouseMove);
+
+      // Unlock pointer and restore cursor when cleaning up
+      if (document.pointerLockElement === canvas) {
+        document.exitPointerLock();
+      }
+      document.body.style.cursor = "auto";
     };
   }, [cameraMode, mouseSensitivity]);
 
@@ -785,13 +845,14 @@ export const GodotCharacterHybrid = ({
           );
         }
 
-        // For follow-orbit, adjust camera height based on vertical mouse offset
-        if (
-          cameraMode === "follow-orbit" &&
-          mouseVerticalOffset.current !== 0
-        ) {
-          const verticalOffset = Math.sin(mouseVerticalOffset.current) * 3;
-          camera.position.y += verticalOffset * 0.1; // Smoothly adjust camera height
+        // For follow-orbit, adjust camera look-at target vertically based on accumulated vertical mouse offset
+        if (cameraMode === "follow-orbit") {
+          // Apply vertical rotation offset (pitch) by adjusting look-at target height
+          // mouseVerticalOffset is already accumulated and clamped, convert to vertical offset
+          const verticalRotationOffset =
+            Math.sin(mouseVerticalOffset.current) * 2;
+          cameraLookAt.current.y =
+            cameraLookAtWorldPosition.current.y + verticalRotationOffset;
         }
 
         camera.lookAt(cameraLookAt.current);

@@ -183,5 +183,83 @@ export const useInstancedBillboardTreesControls = () => {
       },
       { collapsed: true }
     ),
+    billboardRotation: folder(
+      {
+        billboardEnableRotation: {
+          value: true,
+          label: "🔄 Enable Billboard Rotation",
+        },
+        billboardRotationDampingDistance: {
+          value: 10.0,
+          label: "🔄 Rotation Damping Start (units)",
+          min: 0.0,
+          max: 50.0,
+          step: 1.0,
+        },
+        billboardRotationStopDistance: {
+          value: 5.0,
+          label: "🔄 Rotation Stop Distance (units)",
+          min: 0.0,
+          max: 20.0,
+          step: 0.5,
+        },
+        billboardRotationThreshold: {
+          value: 0.05,
+          label: "🔄 Rotation Threshold (radians)",
+          min: 0.0,
+          max: 0.5,
+          step: 0.01,
+        },
+        billboardRotationSmoothing: {
+          value: 0.05,
+          label: "🔄 Rotation Smoothing (Lower=faster, Higher=slower)",
+          min: 0.0,
+          max: 1.0,
+          step: 0.01,
+        },
+      },
+      { collapsed: true }
+    ),
+    transparency: folder(
+      {
+        billboardAlphaTest: {
+          value: 0.1,
+          label: "🎨 Alpha Test Threshold (Lower = firmer edges)",
+          min: 0.0,
+          max: 1.0,
+          step: 0.01,
+        },
+        billboardPremultiplyAlpha: {
+          value: true,
+          label: "🎨 Premultiply Alpha (Fixes white edges)",
+        },
+        billboardEdgeBleedCompensation: {
+          value: 1.0,
+          label: "🎨 Edge Bleed Compensation",
+          min: 0.5,
+          max: 2.0,
+          step: 0.1,
+        },
+        billboardDistanceAlphaTest: {
+          value: true,
+          label: "🎨 Distance-Based Alpha Test",
+        },
+        billboardDistanceAlphaStart: {
+          value: 50.0,
+          label: "Distance Alpha Start",
+          min: 0.0,
+          max: 200.0,
+          step: 5.0,
+        },
+        billboardDistanceAlphaEnd: {
+          value: 200.0,
+          label: "Distance Alpha End",
+          min: 50.0,
+          max: 500.0,
+          step: 5.0,
+        },
+      },
+      { collapsed: true }
+    ),
   });
 };
