@@ -39,6 +39,7 @@ import { Tree } from "./Tree";
 import { InstancedTrees } from "./InstancedTrees";
 import { InstancedBillboardTrees } from "./InstancedBillboardTrees";
 import { InstancedPines } from "./InstancedPines";
+import { WildflowerField } from "./WildflowerMeadow";
 import { AnimatedTree } from "./AnimatedTree";
 import { AnimatedTree2 } from "./AnimatedTree2";
 import { AnimatedTree3 } from "./AnimatedTree3";
@@ -283,6 +284,115 @@ export const Map1 = ({
       },
       { collapsed: true }
     ),
+  });
+
+  const {
+    wildflowerFieldEnabled,
+    wildflowerFieldGridSize,
+    wildflowerFieldPatchSpacing,
+    wildflowerFieldNumFlowers,
+    wildflowerFieldPatchSize,
+    wildflowerFieldStemWidth,
+    wildflowerFieldStemHeight,
+    wildflowerFieldFlowerSize,
+    wildflowerFieldCenterX,
+    wildflowerFieldCenterY,
+    wildflowerFieldCenterZ,
+    wildflowerFieldCastShadow,
+    wildflowerFieldReceiveShadow,
+    wildflowerFieldUseTexture,
+    wildflowerFieldTexturePath,
+  } = useControls("🌸 Wildflowers", {
+    wildflowerFieldEnabled: {
+      value: false,
+      label: "🌸 Enable Wildflower Field",
+    },
+    wildflowerFieldGridSize: {
+      value: 5,
+      min: 1,
+      max: 15,
+      step: 1,
+      label: "Grid Size",
+    },
+    wildflowerFieldPatchSpacing: {
+      value: 8,
+      min: 4,
+      max: 20,
+      step: 1,
+      label: "Patch Spacing",
+    },
+    wildflowerFieldNumFlowers: {
+      value: 32 * 32,
+      min: 256,
+      max: 128 * 128,
+      step: 256,
+      label: "Flowers Per Patch",
+    },
+    wildflowerFieldPatchSize: {
+      value: 10,
+      min: 2,
+      max: 20,
+      step: 1,
+      label: "Patch Size",
+    },
+    wildflowerFieldStemWidth: {
+      value: 0.03,
+      min: 0.005,
+      max: 0.1,
+      step: 0.005,
+      label: "Stem Width",
+    },
+    wildflowerFieldStemHeight: {
+      value: 0.8,
+      min: 0.2,
+      max: 2,
+      step: 0.05,
+      label: "Stem Height",
+    },
+    wildflowerFieldFlowerSize: {
+      value: 0.15,
+      min: 0.05,
+      max: 0.5,
+      step: 0.01,
+      label: "Flower Size",
+    },
+    wildflowerFieldCenterX: {
+      value: 0,
+      min: -50,
+      max: 50,
+      step: 1,
+      label: "Center X",
+    },
+    wildflowerFieldCenterY: {
+      value: 0,
+      min: -10,
+      max: 10,
+      step: 0.5,
+      label: "Center Y",
+    },
+    wildflowerFieldCenterZ: {
+      value: 0,
+      min: -50,
+      max: 50,
+      step: 1,
+      label: "Center Z",
+    },
+    wildflowerFieldCastShadow: {
+      value: false,
+      label: "Cast Shadow",
+    },
+    wildflowerFieldReceiveShadow: {
+      value: true,
+      label: "Receive Shadow",
+    },
+    wildflowerFieldUseTexture: {
+      value: false,
+      label: "Use Flower Texture",
+    },
+    wildflowerFieldTexturePath: {
+      value: "/textures/flower1.png",
+      label: "Texture Path",
+    },
   });
 
   // Get AnimatedTree2 controls
@@ -1031,6 +1141,29 @@ export const Map1 = ({
           grassHeight={1.5}
           lodDistance={15}
           maxDistance={100}
+        />
+      )}
+
+      {/* Wildflower Field */}
+      {wildflowerFieldEnabled && (
+        <WildflowerField
+          gridSize={wildflowerFieldGridSize}
+          patchSpacing={wildflowerFieldPatchSpacing}
+          centerPosition={[
+            wildflowerFieldCenterX,
+            wildflowerFieldCenterY,
+            wildflowerFieldCenterZ,
+          ]}
+          numFlowers={wildflowerFieldNumFlowers}
+          patchSize={wildflowerFieldPatchSize}
+          stemWidth={wildflowerFieldStemWidth}
+          stemHeight={wildflowerFieldStemHeight}
+          flowerSize={wildflowerFieldFlowerSize}
+          playerPosition={characterPosition || fallbackPosition}
+          castShadow={wildflowerFieldCastShadow}
+          receiveShadow={wildflowerFieldReceiveShadow}
+          useFlowerTexture={wildflowerFieldUseTexture}
+          flowerTextureUrl={wildflowerFieldTexturePath || null}
         />
       )}
 
