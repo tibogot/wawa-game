@@ -33,6 +33,8 @@ interface OctahedralForestProps {
   terrainMesh?: THREE.Mesh; // For height sampling via raycasting
   getTerrainHeight?: (x: number, z: number) => number; // Alternative: direct height lookup
   lodDistances?: { mid: number; far: number };
+  leavesAlphaTest?: number;
+  leavesOpacity?: number;
   impostorSettings?: {
     spritesPerSide?: number;
     textureSize?: number;
@@ -50,6 +52,8 @@ export const OctahedralForest: React.FC<OctahedralForestProps> = ({
   terrainMesh,
   getTerrainHeight,
   lodDistances = { mid: 20, far: 100 }, // Exact same as demo!
+  leavesAlphaTest = 0.4,
+  leavesOpacity = 1,
   impostorSettings = {
     spritesPerSide: 12,
     textureSize: 1024,
@@ -92,8 +96,9 @@ export const OctahedralForest: React.FC<OctahedralForestProps> = ({
         if (material.transparent || (material as any).alphaTest) {
           // Clone and optimize leaves material (exactly like demo)
           const newMat = material.clone();
-          (newMat as any).alphaTest = 0.4;
-          newMat.transparent = false;
+          (newMat as any).alphaTest = leavesAlphaTest;
+          newMat.opacity = leavesOpacity;
+          newMat.transparent = leavesOpacity < 1;
 
           // Disable mipmaps for better impostor quality (demo optimization!)
           if ((newMat as any).map) {
@@ -102,14 +107,16 @@ export const OctahedralForest: React.FC<OctahedralForestProps> = ({
 
           mesh.material = newMat;
           console.log(
-            `   🍃 Fixed leaves material: alphaTest=0.4, mipmaps=false`
+            `   🍃 Applied leaves material: alphaTest=${leavesAlphaTest.toFixed(
+              2
+            )}, opacity=${leavesOpacity.toFixed(2)}, mipmaps=false`
           );
         }
       });
 
       // ========== STEP 3: Merge geometries with groups ==========
       const geometries = meshes.map((m) => m.geometry);
-      const materials = meshes.map((m) => m.material);
+      const materials = meshes.map((m) => m.material as THREE.Material);
 
       const mergedGeo = mergeGeometries(geometries, true); // true = use groups
       console.log("   ✅ Merged geometries with groups");
@@ -155,7 +162,7 @@ export const OctahedralForest: React.FC<OctahedralForestProps> = ({
         createEntities: true,
         renderer: gl,
         capacity: positions.length,
-      });
+      }) as unknown as InstancedMesh2 & { camera?: THREE.Camera };
 
       // Set camera reference for LOD updates (CRITICAL!)
       iMesh.camera = camera;
@@ -185,9 +192,7 @@ export const OctahedralForest: React.FC<OctahedralForestProps> = ({
         const LODGeo = await simplifyGeometriesByError(geometries, [0, 0.01]);
         const mergedGeoLOD = mergeGeometries(LODGeo, true);
 
-        const clonedMaterials = materials.map((m) =>
-          (m as THREE.Material).clone()
-        );
+        const clonedMaterials = materials.map((m) => m.clone());
         iMesh.addLOD(mergedGeoLOD, clonedMaterials, lodDistances.mid);
 
         const originalTris = geometries.reduce(
@@ -221,7 +226,7 @@ export const OctahedralForest: React.FC<OctahedralForestProps> = ({
           renderer: gl,
           target: scene,
           useHemiOctahedron: impostorSettings.useHemiOctahedron ?? true,
-          transparent: false,
+          transparent: leavesOpacity < 1,
           alphaClamp: impostorSettings.alphaClamp ?? 0.4,
           spritesPerSide: impostorSettings.spritesPerSide ?? 12,
           textureSize: impostorSettings.textureSize ?? 1024,

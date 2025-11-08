@@ -161,6 +161,9 @@ export const Map1 = ({
     centerZ,
     lodMid,
     lodFar,
+      leavesAlphaTest,
+      leavesOpacity,
+      impostorAlphaClamp,
   } = useImpostorForestControls();
 
   // Get LeafPileMountain controls
@@ -1176,6 +1179,9 @@ export const Map1 = ({
           treeCount={treeCount}
           modelPath="/models/tree.glb"
           lodDistances={{ mid: lodMid, low: lodFar }}
+          leavesAlphaTest={leavesAlphaTest}
+          leavesOpacity={leavesOpacity}
+          impostorAlphaClamp={impostorAlphaClamp}
         />
       )}
 

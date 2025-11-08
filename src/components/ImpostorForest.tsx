@@ -23,10 +23,11 @@ interface ImpostorForestProps {
   enableImpostor?: boolean;
   useInstancing?: boolean;
   useLOD?: boolean;
-  lodDistances?: { mid: number; low: number };
+  lodDistances?: { mid: number; low?: number; far?: number };
   simplificationRatios?: { mid: number; low: number };
   leavesOpacity?: number;
   leavesAlphaTest?: number;
+  impostorAlphaClamp?: number;
   terrainMesh?: THREE.Mesh | null;
   getTerrainHeight?: (x: number, z: number) => number;
 }
@@ -38,6 +39,9 @@ export const ImpostorForest: React.FC<ImpostorForestProps> = ({
   treeCount = 100,
   modelPath = "/models/tree.glb",
   lodDistances = { mid: 100, low: 180 },
+  leavesAlphaTest = 0.4,
+  leavesOpacity = 1,
+  impostorAlphaClamp = 0.4,
   terrainMesh,
   getTerrainHeight,
 }) => {
@@ -45,6 +49,9 @@ export const ImpostorForest: React.FC<ImpostorForestProps> = ({
   // LOD distances converted to octahedral system:
   // - mid becomes the simplified mesh LOD (15m in demo, we use the passed value)
   // - low becomes the impostor LOD (100m in demo, we use the passed value)
+
+  const midDistance = lodDistances?.mid ?? 20;
+  const farDistance = lodDistances?.far ?? lodDistances?.low ?? 100;
 
   return (
     <OctahedralForest
@@ -56,14 +63,16 @@ export const ImpostorForest: React.FC<ImpostorForestProps> = ({
       terrainMesh={terrainMesh || undefined}
       getTerrainHeight={getTerrainHeight}
       lodDistances={{
-        mid: 20, // meshoptimizer LOD starts at 20m (demo standard)
-        far: 100, // impostor LOD starts at 100m (demo standard)
+        mid: midDistance,
+        far: farDistance,
       }}
+      leavesAlphaTest={leavesAlphaTest}
+      leavesOpacity={leavesOpacity}
       impostorSettings={{
         spritesPerSide: 12,
         textureSize: 1024,
         useHemiOctahedron: true,
-        alphaClamp: 0.4,
+        alphaClamp: impostorAlphaClamp,
       }}
     />
   );

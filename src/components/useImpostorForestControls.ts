@@ -64,6 +64,27 @@ export const useImpostorForestControls = () => {
           max: 300,
           step: 10,
         },
+        leavesAlphaTest: {
+          value: 0.4,
+          label: "Leaves Alpha Test",
+          min: 0,
+          max: 1,
+          step: 0.01,
+        },
+        leavesOpacity: {
+          value: 1,
+          label: "Leaves Opacity",
+          min: 0.2,
+          max: 1,
+          step: 0.01,
+        },
+        impostorAlphaClamp: {
+          value: 0.4,
+          label: "Impostor Alpha Clamp",
+          min: 0,
+          max: 1,
+          step: 0.01,
+        },
       },
       { collapsed: true }
     ),

@@ -388,6 +388,9 @@ export const Map9 = forwardRef(
       centerZ,
       lodMid,
       lodFar,
+      leavesAlphaTest,
+      leavesOpacity,
+      impostorAlphaClamp,
     } = useImpostorForestControls();
 
     // Get InstancedTrees controls
@@ -1392,6 +1395,9 @@ export const Map9 = forwardRef(
             treeCount={treeCount}
             getTerrainHeight={getGroundHeight}
             lodDistances={{ mid: lodMid, low: lodFar }}
+            leavesAlphaTest={leavesAlphaTest}
+            leavesOpacity={leavesOpacity}
+            impostorAlphaClamp={impostorAlphaClamp}
           />
         )}
 

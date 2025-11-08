@@ -544,6 +544,9 @@ export const Map5 = forwardRef<any, any>(
       centerZ,
       lodMid,
       lodFar,
+      leavesAlphaTest,
+      leavesOpacity,
+      impostorAlphaClamp,
     } = useImpostorForestControls();
 
     // Get dynamicLeaves3 controls from separate hook
@@ -765,6 +768,9 @@ export const Map5 = forwardRef<any, any>(
             treeCount={treeCount}
             modelPath="/models/tree.glb"
             lodDistances={{ mid: lodMid, low: lodFar }}
+            leavesAlphaTest={leavesAlphaTest}
+            leavesOpacity={leavesOpacity}
+            impostorAlphaClamp={impostorAlphaClamp}
             getTerrainHeight={getTerrainHeight}
           />
         )}

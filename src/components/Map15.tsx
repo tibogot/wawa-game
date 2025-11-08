@@ -7,8 +7,9 @@ import React, {
   useState,
 } from "react";
 import { useGLTF } from "@react-three/drei";
-import { RigidBody } from "@react-three/rapier";
+import { RigidBody, RigidBodyApi } from "@react-three/rapier";
 import * as THREE from "three";
+import { useFrame } from "@react-three/fiber";
 import { TileMaterial } from "./TileMaterial";
 import { TileCube } from "./TileCube";
 import {
@@ -84,6 +85,7 @@ export const Map15 = forwardRef<THREE.Mesh | null, Map15Props>(
         <PhysicsDebugCubes enabled={physicsReady} spawnHeight={5} />
         <CylinderTile position={[-10, 0, 10]} />
         <ParkourTile position={[10, 0, -10]} />
+        <ElevatorPlatform position={[0, 0, 15]} />
         <WallSegment
           length={100}
           height={10}
@@ -307,6 +309,68 @@ const WallSegment = ({
     >
       <mesh castShadow receiveShadow>
         <boxGeometry args={geometryArgs} />
+        <TileMaterial textureScale={textureScale} />
+      </mesh>
+    </RigidBody>
+  );
+};
+
+type ElevatorPlatformProps = {
+  position?: [number, number, number];
+  height?: number;
+  cycleDuration?: number;
+  size?: [number, number, number];
+};
+
+const ElevatorPlatform = ({
+  position = [0, 0, 0],
+  height = 8,
+  cycleDuration = 8,
+  size = [4, 0.5, 4],
+}: ElevatorPlatformProps) => {
+  const bodyRef = useRef<RigidBodyApi | null>(null);
+  const timeRef = useRef(0);
+  const [width, thickness, depth] = size;
+  const textureScale = Math.max(width, depth) * TILE_DENSITY;
+
+  useEffect(() => {
+    if (bodyRef.current) {
+      bodyRef.current.setTranslation(
+        { x: position[0], y: position[1], z: position[2] },
+        true
+      );
+      bodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    }
+  }, [position]);
+
+  useFrame((_, delta) => {
+    if (!bodyRef.current) return;
+
+    timeRef.current = (timeRef.current + delta) % cycleDuration;
+    const angularSpeed = (Math.PI * 2) / cycleDuration;
+    const angle = timeRef.current * angularSpeed;
+    const amplitude = height / 2;
+    const offsetY = position[1] + amplitude;
+    const newY = offsetY + Math.sin(angle) * amplitude;
+    const velocityY = Math.cos(angle) * angularSpeed * amplitude;
+
+    bodyRef.current.setTranslation(
+      { x: position[0], y: newY, z: position[2] },
+      true
+    );
+    bodyRef.current.setLinvel({ x: 0, y: velocityY, z: 0 }, true);
+  });
+
+  return (
+    <RigidBody
+      ref={bodyRef}
+      type="kinematicVelocity"
+      colliders="cuboid"
+      friction={1}
+      restitution={0}
+    >
+      <mesh castShadow receiveShadow>
+        <boxGeometry args={size} />
         <TileMaterial textureScale={textureScale} />
       </mesh>
     </RigidBody>
