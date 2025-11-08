@@ -9,9 +9,11 @@ let sharedTexture: THREE.Texture | null = null;
 export const TileMaterial = ({
   textureScale = 1.0,
   gradientIntensity = 0.5,
+  gradientBias = 0.0,
 }: {
   textureScale?: number;
   gradientIntensity?: number;
+  gradientBias?: number;
 }) => {
   // Load grid texture (shared instance)
   const gridTexture = useTexture("/textures/grid.png");
@@ -26,8 +28,9 @@ export const TileMaterial = ({
       gridTexture: { value: gridTexture },
       gradientIntensity: { value: gradientIntensity },
       textureScale: { value: textureScale },
+      gradientBias: { value: gradientBias },
     }),
-    [gridTexture, gradientIntensity, textureScale]
+    [gridTexture, gradientIntensity, textureScale, gradientBias]
   );
 
   return (
@@ -44,6 +47,7 @@ export const TileMaterial = ({
         uniform sampler2D gridTexture;
         uniform float gradientIntensity;
         uniform float textureScale;
+        uniform float gradientBias;
         varying vec2 vUv;
         
         float hash12(vec2 p) {
@@ -65,8 +69,14 @@ export const TileMaterial = ({
           
           float variationAmount = gradientIntensity * 0.2;
           
+          float baseShade = clamp(
+            0.45 + remap(gridHash1, 0.0, 1.0, -variationAmount, variationAmount) + gradientBias,
+            0.0,
+            1.0
+          );
+
           vec3 gridColour = mix(
-            vec3(0.45 + remap(gridHash1, 0.0, 1.0, -variationAmount, variationAmount)), 
+            vec3(baseShade), 
             vec3(0.08), 
             grid2
           );

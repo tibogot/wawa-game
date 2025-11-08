@@ -1,0 +1,314 @@
+import React, {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useGLTF } from "@react-three/drei";
+import { RigidBody } from "@react-three/rapier";
+import * as THREE from "three";
+import { TileMaterial } from "./TileMaterial";
+import { TileCube } from "./TileCube";
+import {
+  TILE_DENSITY,
+  TILE_REFERENCE_SCALE,
+  TILE_REFERENCE_SIZE,
+} from "./tileMaterialConfig";
+import { PhysicsDebugCubes } from "./PhysicsDebugCubes";
+
+type Map15Props = {
+  scale?: number;
+  position?: [number, number, number];
+  onTerrainReady?: (terrain: THREE.Mesh | null) => void;
+} & React.ComponentProps<"group">;
+
+export const Map15 = forwardRef<THREE.Mesh | null, Map15Props>(
+  (
+    { scale = 1, position = [0, 0, 0], onTerrainReady, ...props }: Map15Props,
+    ref
+  ) => {
+    const floorRef = useRef<THREE.Mesh | null>(null);
+    const [physicsReady, setPhysicsReady] = useState(false);
+    const assignRefs = useCallback(
+      (value: THREE.Mesh | null) => {
+        floorRef.current = value;
+        if (typeof ref === "function") {
+          ref(value);
+        } else if (ref) {
+          ref.current = value;
+        }
+      },
+      [ref]
+    );
+
+    useEffect(() => {
+      if (onTerrainReady) {
+        onTerrainReady(floorRef.current);
+      }
+      let timeoutId: number | null = window.setTimeout(() => {
+        setPhysicsReady(true);
+      }, 150);
+      return () => {
+        if (timeoutId !== null) {
+          window.clearTimeout(timeoutId);
+        }
+        setPhysicsReady(false);
+      };
+    }, [onTerrainReady]);
+
+    return (
+      <group {...props}>
+        <RigidBody
+          type="fixed"
+          colliders="trimesh"
+          position={position}
+          restitution={0}
+          friction={1}
+        >
+          <mesh
+            ref={assignRefs}
+            rotation={[-Math.PI / 2, 0, 0]}
+            scale={scale}
+            castShadow
+            receiveShadow
+          >
+            <planeGeometry args={[TILE_REFERENCE_SIZE, TILE_REFERENCE_SIZE]} />
+            <TileMaterial textureScale={TILE_REFERENCE_SCALE} />
+          </mesh>
+        </RigidBody>
+        {physicsReady && (
+          <TileCube position={[0, 1, -5]} size={[2, 2, 2]} dynamic />
+        )}
+        <PhysicsDebugCubes enabled={physicsReady} spawnHeight={5} />
+        <CylinderTile position={[-10, 0, 10]} />
+        <ParkourTile position={[10, 0, -10]} />
+        <WallSegment
+          length={100}
+          height={10}
+          thickness={2}
+          orientation="x"
+          position={[0, 5, 51]}
+        />
+        <WallSegment
+          length={100}
+          height={10}
+          thickness={2}
+          orientation="x"
+          position={[0, 5, -51]}
+        />
+        <WallSegment
+          length={100}
+          height={10}
+          thickness={2}
+          orientation="z"
+          position={[51, 5, 0]}
+        />
+        <WallSegment
+          length={100}
+          height={10}
+          thickness={2}
+          orientation="z"
+          position={[-51, 5, 0]}
+        />
+      </group>
+    );
+  }
+);
+
+Map15.displayName = "Map15";
+
+type ExtractedMesh = {
+  geometry: THREE.BufferGeometry;
+  position: [number, number, number];
+  rotation: [number, number, number];
+  scale: [number, number, number];
+  textureScale: number;
+};
+
+const CYLINDER_PATH = "/models/parkour/cylinder.glb";
+const PARKOUR_PATH = "/models/parkour/parkour1.glb";
+useGLTF.preload(CYLINDER_PATH);
+useGLTF.preload(PARKOUR_PATH);
+
+type SharedTileProps = {
+  position?: [number, number, number];
+  textureScale?: number;
+};
+
+const createMeshEntries = (
+  scene: THREE.Group,
+  adjustGeometry?: (
+    geometry: THREE.BufferGeometry,
+    meshScale: THREE.Vector3
+  ) => void
+) => {
+  const results: ExtractedMesh[] = [];
+  scene.updateMatrixWorld(true);
+
+  scene.traverse((child) => {
+    if ((child as THREE.Mesh).isMesh) {
+      const mesh = child as THREE.Mesh;
+      const geometry = mesh.geometry.clone();
+      geometry.computeVertexNormals();
+      geometry.computeBoundingBox();
+
+      if (adjustGeometry) {
+        adjustGeometry(geometry, mesh.scale.clone());
+        geometry.computeBoundingBox();
+      }
+
+      const size = new THREE.Vector3();
+      geometry.boundingBox?.getSize(size);
+      size.multiply(mesh.scale);
+
+      const spanX = Math.abs(size.x);
+      const spanZ = Math.abs(size.z);
+      const representativeSpan =
+        spanX > 0 && spanZ > 0
+          ? (spanX + spanZ) * 0.5
+          : Math.max(spanX, spanZ, 1);
+
+      const localPosition = mesh.position.clone();
+      const localRotation = new THREE.Euler(
+        mesh.rotation.x,
+        mesh.rotation.y,
+        mesh.rotation.z
+      );
+      const localScale = mesh.scale.clone();
+
+      results.push({
+        geometry,
+        position: [localPosition.x, localPosition.y, localPosition.z],
+        rotation: [localRotation.x, localRotation.y, localRotation.z],
+        scale: [localScale.x, localScale.y, localScale.z],
+        textureScale: representativeSpan * TILE_DENSITY,
+      });
+    }
+  });
+
+  return results;
+};
+
+const CylinderTile = ({ position = [0, 0, 0] }: SharedTileProps) => {
+  const { scene } = useGLTF(CYLINDER_PATH);
+
+  const meshes = useMemo(() => createMeshEntries(scene), [scene]);
+
+  return (
+    <RigidBody
+      type="fixed"
+      colliders="trimesh"
+      position={position}
+      friction={1}
+      restitution={0}
+    >
+      {meshes.map((mesh, index) => (
+        <mesh
+          key={index}
+          geometry={mesh.geometry}
+          position={mesh.position}
+          rotation={mesh.rotation}
+          scale={mesh.scale}
+          castShadow
+          receiveShadow
+        >
+          <TileMaterial
+            textureScale={mesh.textureScale}
+            gradientBias={-0.5}
+            gradientIntensity={2}
+          />
+        </mesh>
+      ))}
+    </RigidBody>
+  );
+};
+
+const ParkourTile = ({ position = [0, 0, 0] }: SharedTileProps) => {
+  const { scene } = useGLTF(PARKOUR_PATH);
+
+  const meshes = useMemo(
+    () =>
+      createMeshEntries(scene, (geometry, meshScale) => {
+        const boundingBox = geometry.boundingBox;
+        if (!boundingBox) return;
+
+        const size = new THREE.Vector3();
+        boundingBox.getSize(size);
+        size.multiply(meshScale);
+
+        if (size.y > 0) {
+          const targetHeight = 2;
+          const verticalScale = targetHeight / size.y;
+          geometry.scale(1, verticalScale, 1);
+        }
+      }),
+    [scene]
+  );
+
+  return (
+    <RigidBody
+      type="fixed"
+      colliders="trimesh"
+      position={position}
+      friction={1}
+      restitution={0}
+    >
+      {meshes.map((mesh, index) => (
+        <mesh
+          key={index}
+          geometry={mesh.geometry}
+          position={mesh.position}
+          rotation={mesh.rotation}
+          scale={mesh.scale}
+          castShadow
+          receiveShadow
+        >
+          <TileMaterial
+            textureScale={mesh.textureScale}
+            gradientBias={-0.5}
+            gradientIntensity={2}
+          />
+        </mesh>
+      ))}
+    </RigidBody>
+  );
+};
+
+type WallSegmentProps = {
+  length: number;
+  height: number;
+  thickness: number;
+  position: [number, number, number];
+  orientation: "x" | "z";
+};
+
+const WallSegment = ({
+  length,
+  height,
+  thickness,
+  position,
+  orientation,
+}: WallSegmentProps) => {
+  const textureScale = Math.max(length, height) * TILE_DENSITY;
+  const geometryArgs: [number, number, number] =
+    orientation === "x"
+      ? [length, height, thickness]
+      : [thickness, height, length];
+
+  return (
+    <RigidBody
+      type="fixed"
+      colliders="cuboid"
+      position={position}
+      restitution={0}
+      friction={1}
+    >
+      <mesh castShadow receiveShadow>
+        <boxGeometry args={geometryArgs} />
+        <TileMaterial textureScale={textureScale} />
+      </mesh>
+    </RigidBody>
+  );
+};

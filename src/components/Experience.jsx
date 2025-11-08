@@ -23,6 +23,7 @@ import { Map11 } from "./Map11";
 import { Map12 } from "./Map12";
 import { Map13 } from "./Map13";
 import { Map14 } from "./Map14";
+import { Map15 } from "./Map15";
 import { DeerController } from "./DeerController";
 import { DeerHerd } from "./DeerHerd";
 import { useLightsControls } from "./useLightsControls";
@@ -86,6 +87,10 @@ const maps = {
     position: [0, 0, 0],
   },
   map14: {
+    scale: 1,
+    position: [0, 0, 0],
+  },
+  map15: {
     scale: 1,
     position: [0, 0, 0],
   },
@@ -209,7 +214,8 @@ export const Experience = () => {
       map !== "map10" &&
       map !== "map11" &&
       map !== "map12" &&
-      map !== "map13"
+      map !== "map13" &&
+      map !== "map15"
     ) {
       setIsTerrainReady(true);
     }
@@ -307,6 +313,13 @@ export const Experience = () => {
       // For Map14 (Simpleterrainblender), spawn above terrain
       const characterPos = [0, 5, 0];
       const deerPos = [5, 5, 5];
+
+      setCharacterSpawnPosition(characterPos);
+      setDeerSpawnPosition(deerPos);
+    } else if (map === "map15") {
+      // For Map15 (TileMaterial floor), keep character near origin
+      const characterPos = [0, 2, 0];
+      const deerPos = [5, 2, 5];
 
       setCharacterSpawnPosition(characterPos);
       setDeerSpawnPosition(deerPos);
@@ -521,13 +534,20 @@ export const Experience = () => {
             position={maps[map].position}
             onTerrainReady={handleTerrainReady}
           />
-        ) : (
+        ) : map === "map14" ? (
           <Map14
             ref={terrainMeshRef}
             scale={maps[map].scale}
             position={maps[map].position}
             characterPosition={characterPositionVector.current}
             characterVelocity={characterVelocity.current}
+            onTerrainReady={handleTerrainReady}
+          />
+        ) : (
+          <Map15
+            ref={terrainMeshRef}
+            scale={maps[map].scale}
+            position={maps[map].position}
             onTerrainReady={handleTerrainReady}
           />
         )}
