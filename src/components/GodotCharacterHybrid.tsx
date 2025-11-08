@@ -229,6 +229,14 @@ export const GodotCharacterHybrid = ({
     // Request pointer lock on click (required for security)
     const requestPointerLock = () => {
       if (canvas && !isPointerLocked.current) {
+        const activeElement = document.activeElement as HTMLElement | null;
+        if (
+          activeElement &&
+          activeElement !== document.body &&
+          typeof activeElement.blur === "function"
+        ) {
+          activeElement.blur();
+        }
         canvas.requestPointerLock().catch((err) => {
           console.warn("Pointer lock failed:", err);
         });
@@ -241,6 +249,14 @@ export const GodotCharacterHybrid = ({
 
       // Hide cursor when locked
       if (isPointerLocked.current) {
+        const activeElement = document.activeElement as HTMLElement | null;
+        if (
+          activeElement &&
+          activeElement !== document.body &&
+          typeof activeElement.blur === "function"
+        ) {
+          activeElement.blur();
+        }
         document.body.style.cursor = "none";
       } else {
         document.body.style.cursor = "auto";
