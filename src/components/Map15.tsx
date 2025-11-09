@@ -6,6 +6,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { useControls } from "leva";
 import { useGLTF } from "@react-three/drei";
 import {
   CuboidCollider,
@@ -21,6 +22,7 @@ import {
   TILE_REFERENCE_SIZE,
 } from "./tileMaterialConfig";
 import { PhysicsDebugCubes } from "./PhysicsDebugCubes";
+import { JointsExample } from "./JointsExample";
 
 type Map15Props = {
   scale?: number;
@@ -61,6 +63,13 @@ export const Map15 = forwardRef<THREE.Mesh | null, Map15Props>(
         setPhysicsReady(false);
       };
     }, [onTerrainReady]);
+
+    const { showJointsExample } = useControls("🧪 Map 15", {
+      showJointsExample: {
+        label: "Show joints example",
+        value: false,
+      },
+    });
 
     return (
       <group {...props}>
@@ -147,6 +156,11 @@ export const Map15 = forwardRef<THREE.Mesh | null, Map15Props>(
         />
         <Trampoline position={[30, 0.3, -20]} />
         <LaunchPad position={[-5, 0.03, 30]} radius={1.75} />
+        {showJointsExample && (
+          <group position={[0, 4, 0]}>
+            <JointsExample />
+          </group>
+        )}
       </group>
     );
   }

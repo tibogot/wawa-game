@@ -40,6 +40,7 @@ import { InstancedTrees } from "./InstancedTrees";
 import { InstancedBillboardTrees } from "./InstancedBillboardTrees";
 import { InstancedPines } from "./InstancedPines";
 import { WildflowerField } from "./WildflowerMeadow";
+import { TyphaReedField } from "./TyphaReedComponent";
 import { AnimatedTree } from "./AnimatedTree";
 import { AnimatedTree2 } from "./AnimatedTree2";
 import { AnimatedTree3 } from "./AnimatedTree3";
@@ -161,9 +162,9 @@ export const Map1 = ({
     centerZ,
     lodMid,
     lodFar,
-      leavesAlphaTest,
-      leavesOpacity,
-      impostorAlphaClamp,
+    leavesAlphaTest,
+    leavesOpacity,
+    impostorAlphaClamp,
   } = useImpostorForestControls();
 
   // Get LeafPileMountain controls
@@ -195,6 +196,24 @@ export const Map1 = ({
     fallingLeavesSpawnCenterX,
     fallingLeavesSpawnCenterY,
     fallingLeavesSpawnCenterZ,
+    typhaEnabled,
+    typhaGridSize,
+    typhaPatchSpacing,
+    typhaSegments,
+    typhaNumReeds,
+    typhaPatchSize,
+    typhaReedWidth,
+    typhaReedHeight,
+    typhaLodDistance,
+    typhaMaxDistance,
+    typhaCastShadow,
+    typhaReceiveShadow,
+    typhaCenterX,
+    typhaCenterY,
+    typhaCenterZ,
+    typhaTerrainHeight,
+    typhaTerrainOffset,
+    typhaTerrainSize,
   } = useControls("🌿 FOLIAGE", {
     tree: folder(
       {
@@ -283,6 +302,128 @@ export const Map1 = ({
           max: 50,
           step: 1,
           label: "📍 Center Z",
+        },
+      },
+      { collapsed: true }
+    ),
+    typhaReeds: folder(
+      {
+        typhaEnabled: {
+          value: false,
+          label: "🌾 Enable Typha Reeds",
+        },
+        typhaGridSize: {
+          value: 3,
+          min: 1,
+          max: 11,
+          step: 1,
+          label: "Grid Size",
+        },
+        typhaPatchSpacing: {
+          value: 8,
+          min: 4,
+          max: 20,
+          step: 1,
+          label: "Patch Spacing",
+        },
+        typhaSegments: {
+          value: 6,
+          min: 3,
+          max: 12,
+          step: 1,
+          label: "Segments",
+        },
+        typhaNumReeds: {
+          value: 512,
+          min: 64,
+          max: 2048,
+          step: 64,
+          label: "Reeds Per Patch",
+        },
+        typhaPatchSize: {
+          value: 10,
+          min: 4,
+          max: 20,
+          step: 1,
+          label: "Patch Size",
+        },
+        typhaReedWidth: {
+          value: 0.1,
+          min: 0.03,
+          max: 0.25,
+          step: 0.005,
+          label: "Reed Width",
+        },
+        typhaReedHeight: {
+          value: 1.2,
+          min: 0.6,
+          max: 3,
+          step: 0.05,
+          label: "Reed Height",
+        },
+        typhaLodDistance: {
+          value: 20,
+          min: 5,
+          max: 40,
+          step: 1,
+          label: "LOD Distance",
+        },
+        typhaMaxDistance: {
+          value: 120,
+          min: 30,
+          max: 200,
+          step: 5,
+          label: "Max Distance",
+        },
+        typhaCastShadow: {
+          value: false,
+          label: "Cast Shadow",
+        },
+        typhaReceiveShadow: {
+          value: true,
+          label: "Receive Shadow",
+        },
+        typhaCenterX: {
+          value: 0,
+          min: -50,
+          max: 50,
+          step: 1,
+          label: "Center X",
+        },
+        typhaCenterY: {
+          value: 0,
+          min: -10,
+          max: 10,
+          step: 0.5,
+          label: "Center Y",
+        },
+        typhaCenterZ: {
+          value: 0,
+          min: -50,
+          max: 50,
+          step: 1,
+          label: "Center Z",
+        },
+        typhaTerrainHeight: {
+          value: 10,
+          min: 0,
+          max: 30,
+          step: 0.5,
+          label: "Terrain Height Scale",
+        },
+        typhaTerrainOffset: {
+          value: 0,
+          min: -10,
+          max: 10,
+          step: 0.5,
+          label: "Terrain Offset",
+        },
+        typhaTerrainSize: {
+          value: 100,
+          min: 10,
+          max: 400,
+          step: 10,
+          label: "Terrain Size",
         },
       },
       { collapsed: true }
@@ -1144,6 +1285,28 @@ export const Map1 = ({
           grassHeight={1.5}
           lodDistance={15}
           maxDistance={100}
+        />
+      )}
+
+      {/* Typha Reed Field */}
+      {typhaEnabled && (
+        <TyphaReedField
+          gridSize={typhaGridSize}
+          patchSpacing={typhaPatchSpacing}
+          centerPosition={[typhaCenterX, typhaCenterY, typhaCenterZ]}
+          segments={typhaSegments}
+          numReeds={typhaNumReeds}
+          patchSize={typhaPatchSize}
+          reedWidth={typhaReedWidth}
+          reedHeight={typhaReedHeight}
+          lodDistance={typhaLodDistance}
+          maxDistance={typhaMaxDistance}
+          playerPosition={characterPosition || fallbackPosition}
+          castShadow={typhaCastShadow}
+          receiveShadow={typhaReceiveShadow}
+          terrainHeight={typhaTerrainHeight}
+          terrainOffset={typhaTerrainOffset}
+          terrainSize={typhaTerrainSize}
         />
       )}
 
