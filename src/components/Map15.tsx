@@ -92,6 +92,12 @@ export const Map15 = forwardRef<THREE.Mesh | null, Map15Props>(
         <StaticPlatform position={[0, 12, 24]} size={[12, 1, 10]} />
         <StaticPlatform position={[8, 13, 24]} size={[6, 1, 6]} />
         <StaticPlatform position={[28, 13.25, 24]} size={[40, 1, 4]} />
+        <JumpTestingCircles
+          startPosition={[28, 13.25, 24]}
+          step={[0, 0, 4.5]}
+          radius={1.6}
+          count={8}
+        />
         <ElevatorPlatform
           position={[12, 6, 18]}
           height={6}
@@ -117,12 +123,13 @@ export const Map15 = forwardRef<THREE.Mesh | null, Map15Props>(
           orientation="x"
           position={[0, 5, 51]}
         />
-        <WallSegment
+        <WallWithOpening
           length={100}
           height={10}
           thickness={2}
           orientation="x"
           position={[0, 5, -51]}
+          openingWidth={8}
         />
         <WallSegment
           length={100}
@@ -335,6 +342,137 @@ const WallSegment = ({
     >
       <mesh castShadow receiveShadow>
         <boxGeometry args={geometryArgs} />
+        <TileMaterial textureScale={textureScale} />
+      </mesh>
+    </RigidBody>
+  );
+};
+
+type WallWithOpeningProps = WallSegmentProps & {
+  openingWidth: number;
+};
+
+const WallWithOpening = ({
+  length,
+  height,
+  thickness,
+  position,
+  orientation,
+  openingWidth,
+}: WallWithOpeningProps) => {
+  const cappedOpening = Math.min(Math.max(openingWidth, 0), length);
+  const segmentLength = (length - cappedOpening) * 0.5;
+
+  if (segmentLength <= 0) {
+    return null;
+  }
+
+  const offset = segmentLength * 0.5 + cappedOpening * 0.5;
+
+  if (orientation === "x") {
+    return (
+      <>
+        <WallSegment
+          length={segmentLength}
+          height={height}
+          thickness={thickness}
+          orientation="x"
+          position={[position[0] - offset, position[1], position[2]]}
+        />
+        <WallSegment
+          length={segmentLength}
+          height={height}
+          thickness={thickness}
+          orientation="x"
+          position={[position[0] + offset, position[1], position[2]]}
+        />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <WallSegment
+        length={segmentLength}
+        height={height}
+        thickness={thickness}
+        orientation="z"
+        position={[position[0], position[1], position[2] - offset]}
+      />
+      <WallSegment
+        length={segmentLength}
+        height={height}
+        thickness={thickness}
+        orientation="z"
+        position={[position[0], position[1], position[2] + offset]}
+      />
+    </>
+  );
+};
+
+type JumpTestingCirclesProps = {
+  startPosition: [number, number, number];
+  step: [number, number, number];
+  radius: number;
+  count: number;
+};
+
+const JumpTestingCircles = ({
+  startPosition,
+  step,
+  radius,
+  count,
+}: JumpTestingCirclesProps) => {
+  const positions = useMemo(() => {
+    return Array.from({ length: count }, (_, index) => {
+      return [
+        startPosition[0] + step[0] * index,
+        startPosition[1] + step[1] * index,
+        startPosition[2] + step[2] * index,
+      ] as [number, number, number];
+    });
+  }, [count, startPosition, step]);
+
+  return (
+    <>
+      {positions.map((position, index) => (
+        <CircularJumpPlatform
+          key={`jump-circle-${index}`}
+          position={position}
+          radius={radius}
+        />
+      ))}
+    </>
+  );
+};
+
+type CircularJumpPlatformProps = {
+  position: [number, number, number];
+  radius: number;
+};
+
+const CircularJumpPlatform = ({
+  position,
+  radius,
+}: CircularJumpPlatformProps) => {
+  const thickness = 0.6;
+  const textureScale = radius * 2 * TILE_DENSITY;
+
+  return (
+    <RigidBody
+      type="fixed"
+      colliders={false}
+      position={position}
+      friction={1}
+      restitution={0}
+    >
+      <CylinderCollider
+        args={[thickness * 0.5, radius]}
+        friction={1}
+        restitution={0}
+      />
+      <mesh castShadow receiveShadow>
+        <cylinderGeometry args={[radius, radius, thickness, 48]} />
         <TileMaterial textureScale={textureScale} />
       </mesh>
     </RigidBody>
