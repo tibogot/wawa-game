@@ -1,5 +1,11 @@
 // Hybrid approach: Rapier for physics + BVH for ground detection
-import React, { useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useKeyboardControls } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import { CapsuleCollider, RigidBody, useRapier } from "@react-three/rapier";
@@ -126,6 +132,10 @@ export const GodotCharacterHybrid = ({
   const container = useRef<any>(null);
   const character = useRef<any>(null);
   const [animation, setAnimation] = useState("idle");
+  const animationRef = useRef(animation);
+  useEffect(() => {
+    animationRef.current = animation;
+  }, [animation]);
   const [isGrounded, setIsGrounded] = useState(true);
   const wasGrounded = useRef(false);
   const jumpPhase = useRef<"none" | "start" | "loop" | "land">("none");
@@ -156,6 +166,117 @@ export const GodotCharacterHybrid = ({
   const teleportHoldFramesRef = useRef(0);
   const teleportCameraPositionRef = useRef(new Vector3());
   const teleportLookAtRef = useRef(new Vector3());
+
+  const leftFootBone = useRef<THREE.Object3D | null>(null);
+  const rightFootBone = useRef<THREE.Object3D | null>(null);
+  const leftFootWorldPosition = useRef(new Vector3());
+  const rightFootWorldPosition = useRef(new Vector3());
+  const prevLeftFootPosition = useRef(new Vector3());
+  const prevRightFootPosition = useRef(new Vector3());
+  const leftFootInitialized = useRef(false);
+  const rightFootInitialized = useRef(false);
+  const leftFootWasGrounded = useRef(false);
+  const rightFootWasGrounded = useRef(false);
+  const footstepCooldownRef = useRef(0);
+  const footBonesMissingWarnedRef = useRef(false);
+  const lastFootstepIndexRef = useRef<number | null>(null);
+
+  const footstepAnimations = useMemo(
+    () => new Set(["walk", "run", "walkBackwards", "crouchWalk"]),
+    []
+  );
+
+  const footstepSoundPaths = useMemo(
+    () => [
+      "/sounds/steps.mp3",
+      "/sounds/steps (2).mp3",
+      "/sounds/steps (3).mp3",
+      "/sounds/steps (5).mp3",
+    ],
+    []
+  );
+
+  const playFootstepSound = useCallback(() => {
+    if (typeof window === "undefined" || footstepSoundPaths.length === 0) {
+      return;
+    }
+
+    let chosenIndex: number;
+    if (footstepSoundPaths.length === 1) {
+      chosenIndex = 0;
+    } else {
+      let attempts = 0;
+      do {
+        chosenIndex = Math.floor(Math.random() * footstepSoundPaths.length);
+        attempts += 1;
+      } while (chosenIndex === lastFootstepIndexRef.current && attempts < 5);
+    }
+
+    lastFootstepIndexRef.current = chosenIndex;
+    const clip = footstepSoundPaths[chosenIndex];
+
+    const audio = new Audio(clip);
+    audio.volume = 0.3;
+    audio.play().catch(() => {
+      /* Ignore playback errors (e.g., user gesture requirement) */
+    });
+  }, [footstepSoundPaths]);
+
+  const castFootRay = useCallback(
+    (position: THREE.Vector3) => {
+      if (!world || !rapier || !rb.current) {
+        return false;
+      }
+
+      const rayOrigin = {
+        x: position.x,
+        y: position.y + 0.05,
+        z: position.z,
+      };
+      const rayDirection = { x: 0, y: -1, z: 0 };
+      const rayLength = 0.35;
+
+      try {
+        const ray = new rapier.Ray(rayOrigin, rayDirection);
+        const hit = world.castRay(
+          ray,
+          rayLength,
+          true,
+          undefined,
+          undefined,
+          undefined,
+          rb.current,
+          undefined
+        );
+
+        return !!(
+          hit &&
+          hit.timeOfImpact !== undefined &&
+          hit.timeOfImpact <= rayLength
+        );
+      } catch (error) {
+        console.warn("Footstep raycast error:", error);
+        return false;
+      }
+    },
+    [rapier, world]
+  );
+
+  const handleFootBonesReady = useCallback(
+    (bones: {
+      leftFoot: THREE.Object3D | null;
+      rightFoot: THREE.Object3D | null;
+    }) => {
+      leftFootBone.current = bones.leftFoot;
+      rightFootBone.current = bones.rightFoot;
+      leftFootInitialized.current = false;
+      rightFootInitialized.current = false;
+      leftFootWasGrounded.current = false;
+      rightFootWasGrounded.current = false;
+      footBonesMissingWarnedRef.current = false;
+    },
+    []
+  );
 
   // Mouse orbit for follow-orbit camera mode (delta-based)
   const mouseOrbitOffset = useRef(0); // Horizontal orbit offset (accumulated from mouse movement deltas)
@@ -622,6 +743,11 @@ export const GodotCharacterHybrid = ({
 
   useFrame((_state, delta) => {
     if (rb.current) {
+      footstepCooldownRef.current = Math.max(
+        footstepCooldownRef.current - delta,
+        0
+      );
+
       const vel = rb.current.linvel();
       if (!vel) return;
 
@@ -704,6 +830,10 @@ export const GodotCharacterHybrid = ({
       if (!wasGrounded.current && grounded) {
         jumpPhase.current = "land";
         setAnimation("jumpLand");
+        if (footstepCooldownRef.current <= 0.05) {
+          playFootstepSound();
+          footstepCooldownRef.current = 0.25;
+        }
         setTimeout(() => {
           if (jumpPhase.current === "land") {
             jumpPhase.current = "none";
@@ -975,6 +1105,77 @@ export const GodotCharacterHybrid = ({
         );
       }
 
+      if (character.current) {
+        character.current.updateMatrixWorld(true);
+      }
+
+      const horizontalSpeed = Math.hypot(vel.x, vel.z);
+      const allowFootstepChecks =
+        footstepAnimations.has(animationRef.current) &&
+        horizontalSpeed > 0.2 &&
+        !danceInput &&
+        !isRolling.current &&
+        !isAttacking.current;
+
+      const processFoot = (
+        boneRef: React.MutableRefObject<THREE.Object3D | null>,
+        worldPosRef: React.MutableRefObject<THREE.Vector3>,
+        prevPosRef: React.MutableRefObject<THREE.Vector3>,
+        initializedRef: React.MutableRefObject<boolean>,
+        wasGroundedRef: React.MutableRefObject<boolean>
+      ) => {
+        if (!boneRef.current) {
+          return false;
+        }
+
+        boneRef.current.updateWorldMatrix(true, false);
+        boneRef.current.getWorldPosition(worldPosRef.current);
+
+        if (!initializedRef.current) {
+          prevPosRef.current.copy(worldPosRef.current);
+          initializedRef.current = true;
+        }
+
+        const verticalVelocity =
+          (worldPosRef.current.y - prevPosRef.current.y) /
+          Math.max(delta, 1e-4);
+        const verticalDelta = prevPosRef.current.y - worldPosRef.current.y;
+        const movingDownward = verticalVelocity < -0.05 || verticalDelta > 0.01;
+        const groundedFoot = castFootRay(worldPosRef.current);
+
+        const triggered =
+          allowFootstepChecks &&
+          groundedFoot &&
+          !wasGroundedRef.current &&
+          movingDownward &&
+          footstepCooldownRef.current <= 0;
+
+        prevPosRef.current.copy(worldPosRef.current);
+        wasGroundedRef.current = groundedFoot;
+
+        return triggered;
+      };
+
+      const leftTriggered = processFoot(
+        leftFootBone,
+        leftFootWorldPosition,
+        prevLeftFootPosition,
+        leftFootInitialized,
+        leftFootWasGrounded
+      );
+      const rightTriggered = processFoot(
+        rightFootBone,
+        rightFootWorldPosition,
+        prevRightFootPosition,
+        rightFootInitialized,
+        rightFootWasGrounded
+      );
+
+      if (leftTriggered || rightTriggered) {
+        playFootstepSound();
+        footstepCooldownRef.current = 0.2;
+      }
+
       rb.current.setLinvel(vel, true);
     }
 
@@ -1072,7 +1273,10 @@ export const GodotCharacterHybrid = ({
               : 0
           }
         >
-          <GodotCharacter animation={animation} />
+          <GodotCharacter
+            animation={animation}
+            onFootBonesReady={handleFootBonesReady}
+          />
         </group>
       </group>
       <CapsuleCollider

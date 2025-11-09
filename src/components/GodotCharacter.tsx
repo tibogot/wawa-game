@@ -7,12 +7,21 @@ import { SkeletonUtils } from "three-stdlib";
 
 interface GodotCharacterProps {
   animation?: string;
+  onFootBonesReady?: (bones: {
+    leftFoot: THREE.Object3D | null;
+    rightFoot: THREE.Object3D | null;
+  }) => void;
   [key: string]: any;
 }
 
-export function GodotCharacter({ animation, ...props }: GodotCharacterProps) {
+export function GodotCharacter({
+  animation,
+  onFootBonesReady,
+  ...props
+}: GodotCharacterProps) {
   const group = useRef<THREE.Group>(null);
   const animationGroup = useRef<THREE.Group>(null);
+  const bonesNotifiedRef = useRef(false);
 
   // Load the model
   const { scene, animations } = useGLTF(
@@ -65,6 +74,85 @@ export function GodotCharacter({ animation, ...props }: GodotCharacterProps) {
       nodes.Mannequin_1.geometry.computeBoundingBox();
     }
   }, [nodes]);
+
+  useEffect(() => {
+    bonesNotifiedRef.current = false;
+  }, [onFootBonesReady]);
+
+  useEffect(() => {
+    if (!nodes || bonesNotifiedRef.current) {
+      return;
+    }
+
+    const footNodeNames = Object.keys(nodes).filter((name) =>
+      name.toLowerCase().includes("foot")
+    );
+
+    if (footNodeNames.length > 0) {
+      console.log("GodotCharacter foot-related nodes:", footNodeNames);
+    } else {
+      console.warn("GodotCharacter: no foot nodes detected in GLB graph.");
+    }
+  }, [nodes, bonesNotifiedRef]);
+
+  useEffect(() => {
+    if (
+      bonesNotifiedRef.current ||
+      !onFootBonesReady ||
+      !animationGroup.current
+    ) {
+      return;
+    }
+
+    const findBoneByCandidates = (candidates: string[]) => {
+      for (const candidate of candidates) {
+        const directMatch = nodes[candidate];
+        if (directMatch) {
+          return directMatch;
+        }
+      }
+
+      const lowerCandidates = candidates.map((name) => name.toLowerCase());
+
+      return Object.values(nodes).find((node: any) => {
+        if (!node || typeof node !== "object") return false;
+        if (!("isBone" in node) || !node.isBone) return false;
+        const nodeName = (node.name || "").toLowerCase();
+        return lowerCandidates.some((candidate) =>
+          nodeName.includes(candidate.toLowerCase())
+        );
+      }) as THREE.Object3D | undefined;
+    };
+
+    const leftFootCandidates = [
+      "mixamorigLeftFoot",
+      "mixamorig_LeftFoot",
+      "LeftFoot",
+      "DEF-footL",
+    ];
+    const rightFootCandidates = [
+      "mixamorigRightFoot",
+      "mixamorig_RightFoot",
+      "RightFoot",
+      "DEF-footR",
+    ];
+
+    const leftFoot =
+      (findBoneByCandidates(leftFootCandidates) as
+        | THREE.Object3D
+        | undefined) || null;
+    const rightFoot =
+      (findBoneByCandidates(rightFootCandidates) as
+        | THREE.Object3D
+        | undefined) || null;
+
+    onFootBonesReady({
+      leftFoot,
+      rightFoot,
+    });
+
+    bonesNotifiedRef.current = true;
+  }, [nodes, onFootBonesReady]);
 
   // Animation mapping - map our animation names to Godot animation names
   const animationMap: { [key: string]: string } = {
