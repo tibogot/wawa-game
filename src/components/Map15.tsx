@@ -24,6 +24,128 @@ import {
 import { PhysicsDebugCubes } from "./PhysicsDebugCubes";
 import { JointsExample } from "./JointsExample";
 
+const TILE_WORLD_UNIT = 1 / TILE_DENSITY;
+
+const createTiledBoxGeometry = (
+  width: number,
+  height: number,
+  depth: number
+) => {
+  const geometry = new THREE.BoxGeometry(width, height, depth);
+  const positionAttr = geometry.attributes.position as THREE.BufferAttribute;
+  const normalAttr = geometry.attributes.normal as THREE.BufferAttribute;
+  const uvAttr = geometry.attributes.uv as THREE.BufferAttribute;
+
+  const positionVector = new THREE.Vector3();
+  const normalVector = new THREE.Vector3();
+
+  for (let i = 0; i < uvAttr.count; i++) {
+    positionVector.fromBufferAttribute(positionAttr, i);
+    normalVector.fromBufferAttribute(normalAttr, i);
+
+    const absNormalX = Math.abs(normalVector.x);
+    const absNormalY = Math.abs(normalVector.y);
+    const absNormalZ = Math.abs(normalVector.z);
+
+    if (absNormalX >= absNormalY && absNormalX >= absNormalZ) {
+      const u = (positionVector.z + depth * 0.5) / TILE_WORLD_UNIT;
+      const v = (positionVector.y + height * 0.5) / TILE_WORLD_UNIT;
+      uvAttr.setXY(i, u, v);
+    } else if (absNormalY >= absNormalX && absNormalY >= absNormalZ) {
+      const u = (positionVector.x + width * 0.5) / TILE_WORLD_UNIT;
+      const v = (positionVector.z + depth * 0.5) / TILE_WORLD_UNIT;
+      uvAttr.setXY(i, u, v);
+    } else {
+      const u = (positionVector.x + width * 0.5) / TILE_WORLD_UNIT;
+      const v = (positionVector.y + height * 0.5) / TILE_WORLD_UNIT;
+      uvAttr.setXY(i, u, v);
+    }
+  }
+
+  uvAttr.needsUpdate = true;
+  return geometry;
+};
+
+const useTiledBoxGeometry = (size: [number, number, number]) => {
+  const [width, height, depth] = size;
+
+  const geometry = useMemo(
+    () => createTiledBoxGeometry(width, height, depth),
+    [width, height, depth]
+  );
+
+  useEffect(() => {
+    return () => {
+      geometry.dispose();
+    };
+  }, [geometry]);
+
+  return geometry;
+};
+
+const createTiledCylinderGeometry = (
+  radius: number,
+  height: number,
+  radialSegments = 48
+) => {
+  const geometry = new THREE.CylinderGeometry(
+    radius,
+    radius,
+    height,
+    radialSegments,
+    1,
+    false
+  );
+
+  const positionAttr = geometry.attributes.position as THREE.BufferAttribute;
+  const normalAttr = geometry.attributes.normal as THREE.BufferAttribute;
+  const uvAttr = geometry.attributes.uv as THREE.BufferAttribute;
+
+  const positionVector = new THREE.Vector3();
+  const normalVector = new THREE.Vector3();
+  const circumference = 2 * Math.PI * radius;
+
+  for (let i = 0; i < uvAttr.count; i++) {
+    positionVector.fromBufferAttribute(positionAttr, i);
+    normalVector.fromBufferAttribute(normalAttr, i);
+
+    if (Math.abs(normalVector.y) < 0.5) {
+      const angle = Math.atan2(positionVector.z, positionVector.x);
+      const wrappedAngle = angle < 0 ? angle + Math.PI * 2 : angle;
+      const distanceAlong = (wrappedAngle / (Math.PI * 2)) * circumference;
+      const u = distanceAlong / TILE_WORLD_UNIT;
+      const v = (positionVector.y + height * 0.5) / TILE_WORLD_UNIT;
+      uvAttr.setXY(i, u, v);
+    } else {
+      const u = (positionVector.x + radius) / TILE_WORLD_UNIT;
+      const v = (positionVector.z + radius) / TILE_WORLD_UNIT;
+      uvAttr.setXY(i, u, v);
+    }
+  }
+
+  uvAttr.needsUpdate = true;
+  return geometry;
+};
+
+const useTiledCylinderGeometry = (
+  radius: number,
+  height: number,
+  radialSegments = 48
+) => {
+  const geometry = useMemo(
+    () => createTiledCylinderGeometry(radius, height, radialSegments),
+    [radius, height, radialSegments]
+  );
+
+  useEffect(() => {
+    return () => {
+      geometry.dispose();
+    };
+  }, [geometry]);
+
+  return geometry;
+};
+
 type Map15Props = {
   scale?: number;
   position?: [number, number, number];
@@ -340,11 +462,11 @@ const WallSegment = ({
   position,
   orientation,
 }: WallSegmentProps) => {
-  const textureScale = Math.max(length, height) * TILE_DENSITY;
   const geometryArgs: [number, number, number] =
     orientation === "x"
       ? [length, height, thickness]
       : [thickness, height, length];
+  const geometry = useTiledBoxGeometry(geometryArgs);
 
   return (
     <RigidBody
@@ -354,9 +476,8 @@ const WallSegment = ({
       restitution={0}
       friction={1}
     >
-      <mesh castShadow receiveShadow>
-        <boxGeometry args={geometryArgs} />
-        <TileMaterial textureScale={textureScale} />
+      <mesh castShadow receiveShadow geometry={geometry}>
+        <TileMaterial />
       </mesh>
     </RigidBody>
   );
@@ -438,13 +559,15 @@ const JumpTestingCircles = ({
   count,
 }: JumpTestingCirclesProps) => {
   const positions = useMemo(() => {
-    return Array.from({ length: count }, (_, index) => {
+    const all = Array.from({ length: count }, (_, index) => {
       return [
         startPosition[0] + step[0] * index,
         startPosition[1] + step[1] * index,
         startPosition[2] + step[2] * index,
       ] as [number, number, number];
     });
+    all.shift();
+    return all;
   }, [count, startPosition, step]);
 
   return (
@@ -470,7 +593,7 @@ const CircularJumpPlatform = ({
   radius,
 }: CircularJumpPlatformProps) => {
   const thickness = 0.6;
-  const textureScale = radius * 2 * TILE_DENSITY;
+  const geometry = useTiledCylinderGeometry(radius, thickness);
 
   return (
     <RigidBody
@@ -485,9 +608,8 @@ const CircularJumpPlatform = ({
         friction={1}
         restitution={0}
       />
-      <mesh castShadow receiveShadow>
-        <cylinderGeometry args={[radius, radius, thickness, 48]} />
-        <TileMaterial textureScale={textureScale} />
+      <mesh castShadow receiveShadow geometry={geometry}>
+        <TileMaterial />
       </mesh>
     </RigidBody>
   );
@@ -642,7 +764,7 @@ const ElevatorPlatform = ({
   const timeRef = useRef(0);
   const lastTimeRef = useRef<number | null>(null);
   const [width, thickness, depth] = size;
-  const textureScale = Math.max(width, depth) * TILE_DENSITY;
+  const platformGeometry = useTiledBoxGeometry(size);
 
   useEffect(() => {
     if (bodyRef.current) {
@@ -738,9 +860,8 @@ const ElevatorPlatform = ({
         friction={1}
         restitution={0}
       />
-      <mesh castShadow receiveShadow>
-        <boxGeometry args={size} />
-        <TileMaterial textureScale={textureScale} />
+      <mesh castShadow receiveShadow geometry={platformGeometry}>
+        <TileMaterial />
       </mesh>
     </RigidBody>
   );
@@ -752,7 +873,7 @@ type StaticPlatformProps = {
 };
 
 const StaticPlatform = ({ position, size }: StaticPlatformProps) => {
-  const textureScale = Math.max(size[0], size[2]) * TILE_DENSITY;
+  const platformGeometry = useTiledBoxGeometry(size);
 
   return (
     <RigidBody
@@ -762,9 +883,8 @@ const StaticPlatform = ({ position, size }: StaticPlatformProps) => {
       friction={1}
       restitution={0}
     >
-      <mesh castShadow receiveShadow>
-        <boxGeometry args={size} />
-        <TileMaterial textureScale={textureScale} />
+      <mesh castShadow receiveShadow geometry={platformGeometry}>
+        <TileMaterial />
       </mesh>
     </RigidBody>
   );
