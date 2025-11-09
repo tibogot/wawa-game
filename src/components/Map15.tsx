@@ -223,6 +223,13 @@ export const Map15 = forwardRef<THREE.Mesh | null, Map15Props>(
         <StaticPlatform position={[0, 12, 24]} size={[12, 1, 10]} />
         <StaticPlatform position={[8, 13, 24]} size={[6, 1, 6]} />
         <StaticPlatform position={[28, 13.05, 24]} size={[40, 1, 4]} />
+        <Staircase
+          position={[46, 0, 35]}
+          stepHeight={0.08}
+          totalHeight={4}
+          stepDepth={0.8}
+          rotation={[0, Math.PI, 0]}
+        />
         <JumpTestingCircles
           startPosition={[28, 13.25, 24]}
           step={[0, 0, 4.5]}
@@ -887,5 +894,73 @@ const StaticPlatform = ({ position, size }: StaticPlatformProps) => {
         <TileMaterial />
       </mesh>
     </RigidBody>
+  );
+};
+
+type StaircaseProps = {
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  stepWidth?: number;
+  stepDepth?: number;
+  totalHeight?: number;
+  stepHeight?: number;
+};
+
+const Staircase = ({
+  position = [0, 0, 0],
+  rotation = [0, 0, 0],
+  stepWidth = 4,
+  stepDepth = 2,
+  totalHeight = 8,
+  stepHeight = 0.2,
+}: StaircaseProps) => {
+  const { geometry, stepOffsets } = useMemo(() => {
+    const desiredHeight = Math.max(0.5, totalHeight);
+    const desiredStepHeight = Math.max(0.05, stepHeight);
+
+    const stepCount = Math.max(
+      1,
+      Math.round(desiredHeight / desiredStepHeight)
+    );
+    const actualStepHeight = desiredHeight / stepCount;
+
+    const sharedGeometry = createTiledBoxGeometry(
+      stepWidth,
+      actualStepHeight,
+      stepDepth
+    );
+
+    const offsets = Array.from({ length: stepCount }, (_, index) => {
+      const y = actualStepHeight * 0.5 + index * actualStepHeight;
+      const z = index * stepDepth;
+      return [0, y, z] as [number, number, number];
+    });
+
+    return { geometry: sharedGeometry, stepOffsets: offsets };
+  }, [stepWidth, stepDepth, totalHeight, stepHeight]);
+
+  useEffect(() => {
+    return () => {
+      geometry.dispose();
+    };
+  }, [geometry]);
+
+  return (
+    <group position={position} rotation={rotation}>
+      {stepOffsets.map((stepPos, index) => (
+        <RigidBody
+          key={`stair-step-${index}`}
+          type="fixed"
+          colliders="cuboid"
+          position={stepPos}
+          friction={1}
+          restitution={0}
+        >
+          <mesh castShadow receiveShadow geometry={geometry}>
+            <TileMaterial />
+          </mesh>
+        </RigidBody>
+      ))}
+    </group>
   );
 };
