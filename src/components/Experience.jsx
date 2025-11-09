@@ -24,6 +24,7 @@ import { Map12 } from "./Map12";
 import { Map13 } from "./Map13";
 import { Map14 } from "./Map14";
 import { Map15 } from "./Map15";
+import { Map16 } from "./Map16";
 import { DeerController } from "./DeerController";
 import { DeerHerd } from "./DeerHerd";
 import { useLightsControls } from "./useLightsControls";
@@ -92,6 +93,10 @@ const maps = {
     position: [0, 0, 0],
   },
   map15: {
+    scale: 1,
+    position: [0, 0, 0],
+  },
+  map16: {
     scale: 1,
     position: [0, 0, 0],
   },
@@ -348,6 +353,13 @@ export const Experience = () => {
 
       setCharacterSpawnPosition(characterPos);
       setDeerSpawnPosition(deerPos);
+    } else if (map === "map16") {
+      // For Map16 (TileMaterial floor only), keep character near origin
+      const characterPos = [0, 2, 0];
+      const deerPos = [5, 2, 5];
+
+      setCharacterSpawnPosition(characterPos);
+      setDeerSpawnPosition(deerPos);
     } else {
       // For other maps, use default positions
       setCharacterSpawnPosition([0, 2, 0]);
@@ -590,8 +602,15 @@ export const Experience = () => {
             characterVelocity={characterVelocity.current}
             onTerrainReady={handleTerrainReady}
           />
-        ) : (
+        ) : map === "map15" ? (
           <Map15
+            ref={terrainMeshRef}
+            scale={maps[map].scale}
+            position={maps[map].position}
+            onTerrainReady={handleTerrainReady}
+          />
+        ) : (
+          <Map16
             ref={terrainMeshRef}
             scale={maps[map].scale}
             position={maps[map].position}
