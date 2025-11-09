@@ -73,7 +73,7 @@ export const useLightsControls = () => {
     sun: folder(
       {
         directionalIntensity: {
-          value: 3.5,
+          value: 1.5,
           min: 0,
           max: 5,
           step: 0.05,
@@ -88,7 +88,7 @@ export const useLightsControls = () => {
           label: "Position [X, Y, Z]",
         },
         shadowMapSize: {
-          value: 4096,
+          value: 2048,
           options: [512, 1024, 2048, 4096, 8192],
           label: "Shadow Map Size",
         },
@@ -114,7 +114,7 @@ export const useLightsControls = () => {
           label: "Shadow Blur Radius",
         },
         followCharacter: {
-          value: true,
+          value: false,
           label: "Follow Character",
         },
         shadowFollowRadius: {
@@ -123,6 +123,42 @@ export const useLightsControls = () => {
           max: 200,
           step: 5,
           label: "Shadow Follow Radius",
+        },
+        useCascadedShadows: {
+          value: true,
+          label: "Use Cascaded Shadows",
+        },
+        csmCascades: {
+          value: 3,
+          min: 1,
+          max: 4,
+          step: 1,
+          label: "CSM Cascades",
+        },
+        csmFade: {
+          value: true,
+          label: "Fade Between Cascades",
+        },
+        csmLightMargin: {
+          value: 150,
+          min: 0,
+          max: 1000,
+          step: 10,
+          label: "CSM Light Margin",
+        },
+        csmPracticalLambda: {
+          value: 0.5,
+          min: 0,
+          max: 1,
+          step: 0.05,
+          label: "CSM Practical Lambda",
+        },
+        csmMaxFar: {
+          value: 300,
+          min: 100,
+          max: 5000,
+          step: 50,
+          label: "CSM Max Far",
         },
       },
       { collapsed: true }

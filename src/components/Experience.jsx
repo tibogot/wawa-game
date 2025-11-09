@@ -27,6 +27,7 @@ import { Map15 } from "./Map15";
 import { DeerController } from "./DeerController";
 import { DeerHerd } from "./DeerHerd";
 import { useLightsControls } from "./useLightsControls";
+import { Csm } from "./Csm";
 import {
   getSafeSpawnPosition,
   getTerrainHeightFromTexture,
@@ -162,6 +163,12 @@ export const Experience = () => {
     shadowCameraFar,
     followCharacter,
     shadowFollowRadius,
+    useCascadedShadows,
+    csmCascades,
+    csmFade,
+    csmLightMargin,
+    csmPracticalLambda,
+    csmMaxFar,
     showTestSphere,
   } = useLightsControls();
 
@@ -172,6 +179,24 @@ export const Experience = () => {
         ? [-15, 80, 15]
         : defaultDirectionalPosition,
     [map, defaultDirectionalPosition]
+  );
+
+  const lightDirectionArray = useMemo(() => {
+    const direction = new THREE.Vector3(
+      -directionalPosition[0],
+      -directionalPosition[1],
+      -directionalPosition[2]
+    );
+    if (direction.lengthSq() === 0) {
+      return [0, -1, 0];
+    }
+    direction.normalize();
+    return [direction.x, direction.y, direction.z];
+  }, [directionalPosition]);
+
+  const csmMaterialVersion = useMemo(
+    () => `${map}-${isTerrainReady}`,
+    [map, isTerrainReady]
   );
 
   // Callback when terrain is ready (for Map5 and Map8)
@@ -332,6 +357,10 @@ export const Experience = () => {
 
   // Update shadow camera position to follow character when enabled
   useFrame(() => {
+    if (useCascadedShadows) {
+      return;
+    }
+
     if (followCharacter && directionalLightRef.current && isTerrainReady) {
       const light = directionalLightRef.current;
 
@@ -422,28 +451,46 @@ export const Experience = () => {
         />
       )}
       <ambientLight intensity={ambientIntensity} />
-      <directionalLight
-        ref={directionalLightRef}
-        intensity={directionalIntensity}
-        color={directionalColor}
-        castShadow
-        position={directionalPosition}
-        shadow-mapSize-width={shadowMapSize}
-        shadow-mapSize-height={shadowMapSize}
-        shadow-bias={shadowBias}
-        shadow-normalBias={shadowNormalBias}
-        shadow-radius={shadowRadius}
-      >
-        <OrthographicCamera
-          left={shadowCameraLeft}
-          right={shadowCameraRight}
-          top={shadowCameraTop}
-          bottom={shadowCameraBottom}
-          near={shadowCameraNear}
-          far={shadowCameraFar}
-          attach={"shadow-camera"}
+      {useCascadedShadows ? (
+        <Csm
+          enabled={useCascadedShadows}
+          cascades={csmCascades}
+          shadowMapSize={shadowMapSize}
+          shadowBias={shadowBias}
+          shadowNormalBias={shadowNormalBias}
+          lightDirection={lightDirectionArray}
+          lightIntensity={directionalIntensity}
+          lightColor={directionalColor}
+          fade={csmFade}
+          lightMargin={csmLightMargin}
+          practicalLambda={csmPracticalLambda}
+          maxFar={csmMaxFar}
+          materialVersion={csmMaterialVersion}
         />
-      </directionalLight>
+      ) : (
+        <directionalLight
+          ref={directionalLightRef}
+          intensity={directionalIntensity}
+          color={directionalColor}
+          castShadow
+          position={directionalPosition}
+          shadow-mapSize-width={shadowMapSize}
+          shadow-mapSize-height={shadowMapSize}
+          shadow-bias={shadowBias}
+          shadow-normalBias={shadowNormalBias}
+          shadow-radius={shadowRadius}
+        >
+          <OrthographicCamera
+            left={shadowCameraLeft}
+            right={shadowCameraRight}
+            top={shadowCameraTop}
+            bottom={shadowCameraBottom}
+            near={shadowCameraNear}
+            far={shadowCameraFar}
+            attach={"shadow-camera"}
+          />
+        </directionalLight>
+      )}
       <Physics key={map} debug={showRapierDebug}>
         {map === "map1" ? (
           <Map1

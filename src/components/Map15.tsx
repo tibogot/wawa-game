@@ -7,7 +7,11 @@ import React, {
   useState,
 } from "react";
 import { useGLTF } from "@react-three/drei";
-import { CuboidCollider, RigidBody } from "@react-three/rapier";
+import {
+  CuboidCollider,
+  CylinderCollider,
+  RigidBody,
+} from "@react-three/rapier";
 import * as THREE from "three";
 import { TileMaterial } from "./TileMaterial";
 import { TileCube } from "./TileCube";
@@ -134,6 +138,8 @@ export const Map15 = forwardRef<THREE.Mesh | null, Map15Props>(
           orientation="z"
           position={[-51, 5, 0]}
         />
+        <Trampoline position={[30, 0.3, -20]} />
+        <LaunchPad position={[-5, 0.03, 30]} radius={1.75} />
       </group>
     );
   }
@@ -330,6 +336,131 @@ const WallSegment = ({
       <mesh castShadow receiveShadow>
         <boxGeometry args={geometryArgs} />
         <TileMaterial textureScale={textureScale} />
+      </mesh>
+    </RigidBody>
+  );
+};
+
+type TrampolineProps = {
+  position?: [number, number, number];
+  restitution?: number;
+};
+
+const Trampoline = ({
+  position = [0, 0.3, 0],
+  restitution = 2.5,
+}: TrampolineProps) => {
+  const [x, y, z] = position;
+  const legOffsets: Array<[number, number]> = [
+    [-1.5, -1.5],
+    [1.5, -1.5],
+    [-1.5, 1.5],
+    [1.5, 1.5],
+  ];
+
+  return (
+    <group>
+      <RigidBody
+        type="fixed"
+        colliders={false}
+        position={position}
+        friction={0.5}
+        restitution={restitution}
+      >
+        <CuboidCollider
+          args={[1.5, 0.15, 1.5]}
+          friction={0.5}
+          restitution={restitution}
+        />
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={[3, 0.3, 3]} />
+          <meshStandardMaterial
+            color="#00ff88"
+            roughness={0.3}
+            metalness={0.1}
+            emissive="#00ff88"
+            emissiveIntensity={0.2}
+          />
+        </mesh>
+      </RigidBody>
+
+      <mesh castShadow receiveShadow position={[x, y - 0.2, z]}>
+        <boxGeometry args={[3.4, 0.2, 3.4]} />
+        <meshStandardMaterial color="#333333" roughness={0.8} metalness={0.3} />
+      </mesh>
+
+      {legOffsets.map(([offsetX, offsetZ], index) => (
+        <mesh
+          key={`trampoline-leg-${index}`}
+          position={[x + offsetX, y - 0.4, z + offsetZ]}
+        >
+          <cylinderGeometry args={[0.1, 0.15, 0.4, 8]} />
+          <meshStandardMaterial
+            color="#333333"
+            roughness={0.8}
+            metalness={0.3}
+          />
+        </mesh>
+      ))}
+    </group>
+  );
+};
+
+type LaunchPadProps = {
+  position?: [number, number, number];
+  radius?: number;
+  height?: number;
+  restitution?: number;
+};
+
+const LaunchPad = ({
+  position = [0, 0.04, 0],
+  radius = 1.5,
+  height = 0.04,
+  restitution = 0,
+}: LaunchPadProps) => {
+  const halfHeight = Math.max(height * 0.5, 0.01);
+  const launchVelocity = 22;
+  const cooldownMs = 300;
+  const lastTriggerRef = useRef(0);
+
+  return (
+    <RigidBody
+      type="fixed"
+      colliders={false}
+      position={position}
+      friction={0.2}
+      restitution={restitution}
+    >
+      <CylinderCollider
+        args={[halfHeight, radius]}
+        sensor
+        friction={0}
+        restitution={0}
+        onIntersectionEnter={({ other }) => {
+          const now = performance.now();
+          if (now - lastTriggerRef.current < cooldownMs) return;
+
+          const body = other.rigidBody;
+          if (!body) return;
+
+          lastTriggerRef.current = now;
+          const velocity = body.linvel();
+          body.setLinvel(
+            { x: velocity.x, y: launchVelocity, z: velocity.z },
+            true
+          );
+        }}
+      />
+      <mesh castShadow receiveShadow>
+        <cylinderGeometry args={[radius, radius, height, 48]} />
+        <meshStandardMaterial
+          color="#ff2222"
+          emissive="#ff2222"
+          emissiveIntensity={0.05}
+          roughness={0.35}
+          metalness={0.15}
+        />
       </mesh>
     </RigidBody>
   );
