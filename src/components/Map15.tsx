@@ -7,9 +7,8 @@ import React, {
   useState,
 } from "react";
 import { useGLTF } from "@react-three/drei";
-import { RigidBody, RigidBodyApi } from "@react-three/rapier";
+import { CuboidCollider, RigidBody } from "@react-three/rapier";
 import * as THREE from "three";
-import { useFrame } from "@react-three/fiber";
 import { TileMaterial } from "./TileMaterial";
 import { TileCube } from "./TileCube";
 import {
@@ -86,6 +85,27 @@ export const Map15 = forwardRef<THREE.Mesh | null, Map15Props>(
         <CylinderTile position={[-10, 0, 10]} />
         <ParkourTile position={[10, 0, -10]} />
         <ElevatorPlatform position={[0, 0, 15]} />
+        <StaticPlatform position={[0, 12, 24]} size={[12, 1, 10]} />
+        <StaticPlatform position={[8, 13, 24]} size={[6, 1, 6]} />
+        <StaticPlatform position={[28, 13.25, 24]} size={[40, 1, 4]} />
+        <ElevatorPlatform
+          position={[12, 6, 18]}
+          height={6}
+          climbDuration={4}
+          descentDuration={4}
+          bottomPause={0.5}
+          topPause={0.5}
+          size={[3, 0.5, 3]}
+        />
+        <ElevatorPlatform
+          position={[-12, 4, 22]}
+          height={8}
+          climbDuration={5}
+          descentDuration={5}
+          bottomPause={0.5}
+          topPause={0.5}
+          size={[3.5, 0.5, 3.5]}
+        />
         <WallSegment
           length={100}
           height={10}
@@ -318,18 +338,26 @@ const WallSegment = ({
 type ElevatorPlatformProps = {
   position?: [number, number, number];
   height?: number;
-  cycleDuration?: number;
+  climbDuration?: number;
+  descentDuration?: number;
+  bottomPause?: number;
+  topPause?: number;
   size?: [number, number, number];
 };
 
 const ElevatorPlatform = ({
   position = [0, 0, 0],
-  height = 8,
-  cycleDuration = 8,
+  height = 20,
+  climbDuration = 10,
+  descentDuration = 10,
+  bottomPause = 0,
+  topPause = 0,
   size = [4, 0.5, 4],
 }: ElevatorPlatformProps) => {
-  const bodyRef = useRef<RigidBodyApi | null>(null);
+  const bodyRef = useRef<any>(null);
+  const animationFrameRef = useRef<number | null>(null);
   const timeRef = useRef(0);
+  const lastTimeRef = useRef<number | null>(null);
   const [width, thickness, depth] = size;
   const textureScale = Math.max(width, depth) * TILE_DENSITY;
 
@@ -343,29 +371,111 @@ const ElevatorPlatform = ({
     }
   }, [position]);
 
-  useFrame((_, delta) => {
-    if (!bodyRef.current) return;
-
-    timeRef.current = (timeRef.current + delta) % cycleDuration;
-    const angularSpeed = (Math.PI * 2) / cycleDuration;
-    const angle = timeRef.current * angularSpeed;
+  useEffect(() => {
+    const pauseTotal = bottomPause + topPause;
+    const travelTotal = climbDuration + descentDuration;
+    const totalDuration = travelTotal + pauseTotal;
     const amplitude = height / 2;
-    const offsetY = position[1] + amplitude;
-    const newY = offsetY + Math.sin(angle) * amplitude;
-    const velocityY = Math.cos(angle) * angularSpeed * amplitude;
+    const centerY = position[1] + amplitude;
+    const bottomY = position[1];
+    const topY = position[1] + height;
 
-    bodyRef.current.setTranslation(
-      { x: position[0], y: newY, z: position[2] },
-      true
-    );
-    bodyRef.current.setLinvel({ x: 0, y: velocityY, z: 0 }, true);
-  });
+    const ease = (u: number) => (1 - Math.cos(Math.PI * u)) * 0.5;
+    const easeDerivative = (u: number) => Math.PI * 0.5 * Math.sin(Math.PI * u);
+
+    // Start at the bottom of the cycle
+    timeRef.current = 0;
+    lastTimeRef.current = performance.now();
+
+    const animate = () => {
+      const body = bodyRef.current;
+      if (body) {
+        const now = performance.now();
+        const last = lastTimeRef.current ?? now;
+        const deltaSeconds = Math.min((now - last) / 1000, 0.05);
+        lastTimeRef.current = now;
+
+        timeRef.current = (timeRef.current + deltaSeconds) % totalDuration;
+
+        const time = timeRef.current;
+        let targetY = bottomY;
+        let velocityY = 0;
+
+        if (time < bottomPause) {
+          targetY = bottomY;
+          velocityY = 0;
+        } else if (time < bottomPause + climbDuration) {
+          const u = (time - bottomPause) / climbDuration;
+          targetY = bottomY + height * ease(u);
+          velocityY = (height * easeDerivative(u)) / climbDuration;
+        } else if (time < bottomPause + climbDuration + topPause) {
+          targetY = topY;
+          velocityY = 0;
+        } else {
+          const u =
+            (time - bottomPause - climbDuration - topPause) / descentDuration;
+          targetY = topY - height * ease(u);
+          velocityY = (-height * easeDerivative(u)) / descentDuration;
+        }
+
+        body.setNextKinematicTranslation({
+          x: position[0],
+          y: targetY,
+          z: position[2],
+        });
+        body.setLinvel({ x: 0, y: velocityY, z: 0 }, true);
+      }
+
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    animationFrameRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      animationFrameRef.current = null;
+      lastTimeRef.current = null;
+    };
+  }, [climbDuration, descentDuration, bottomPause, topPause, height, position]);
 
   return (
     <RigidBody
       ref={bodyRef}
       type="kinematicVelocity"
+      colliders={false}
+      friction={1}
+      restitution={0}
+      ccd
+      position={position}
+    >
+      <CuboidCollider
+        args={[width / 2, thickness / 2, depth / 2]}
+        friction={1}
+        restitution={0}
+      />
+      <mesh castShadow receiveShadow>
+        <boxGeometry args={size} />
+        <TileMaterial textureScale={textureScale} />
+      </mesh>
+    </RigidBody>
+  );
+};
+
+type StaticPlatformProps = {
+  position: [number, number, number];
+  size: [number, number, number];
+};
+
+const StaticPlatform = ({ position, size }: StaticPlatformProps) => {
+  const textureScale = Math.max(size[0], size[2]) * TILE_DENSITY;
+
+  return (
+    <RigidBody
+      type="fixed"
       colliders="cuboid"
+      position={position}
       friction={1}
       restitution={0}
     >
