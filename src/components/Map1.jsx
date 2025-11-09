@@ -41,6 +41,7 @@ import { InstancedBillboardTrees } from "./InstancedBillboardTrees";
 import { InstancedPines } from "./InstancedPines";
 import { WildflowerField } from "./WildflowerMeadow";
 import { TyphaReedField } from "./TyphaReedComponent";
+import Roseau from "./Roseau";
 import { AnimatedTree } from "./AnimatedTree";
 import { AnimatedTree2 } from "./AnimatedTree2";
 import { AnimatedTree3 } from "./AnimatedTree3";
@@ -214,6 +215,31 @@ export const Map1 = ({
     typhaTerrainHeight,
     typhaTerrainOffset,
     typhaTerrainSize,
+    roseauEnabled,
+    roseauPositionX,
+    roseauPositionY,
+    roseauPositionZ,
+    roseauStemHeight,
+    roseauStemRadiusTop,
+    roseauStemRadiusBottom,
+    roseauStemRadialSegments,
+    roseauStemHeightSegments,
+    roseauCapsuleRadius,
+    roseauCapsuleLength,
+    roseauCapsuleRadialSegments,
+    roseauCapsuleCapSegments,
+    roseauVerticalSpacing,
+    roseauStemColor,
+    roseauCapsuleColor,
+    roseauWindEnabled,
+    roseauWindStrength,
+    roseauWindSpeed,
+    roseauWindGustStrength,
+    roseauWindGustFrequency,
+    roseauWindStiffness,
+    roseauWindLean,
+    roseauWindDirectionX,
+    roseauWindDirectionZ,
   } = useControls("🌿 FOLIAGE", {
     tree: folder(
       {
@@ -424,6 +450,174 @@ export const Map1 = ({
           max: 400,
           step: 10,
           label: "Terrain Size",
+        },
+      },
+      { collapsed: true }
+    ),
+    roseauTest: folder(
+      {
+        roseauEnabled: {
+          value: false,
+          label: "🌱 Enable Roseau Test",
+        },
+        roseauPositionX: {
+          value: 0,
+          min: -20,
+          max: 20,
+          step: 0.25,
+          label: "Position X",
+        },
+        roseauPositionY: {
+          value: 0,
+          min: -1,
+          max: 2,
+          step: 0.05,
+          label: "Position Y",
+        },
+        roseauPositionZ: {
+          value: 0,
+          min: -20,
+          max: 20,
+          step: 0.25,
+          label: "Position Z",
+        },
+        roseauStemHeight: {
+          value: 0.75,
+          min: 0.2,
+          max: 1,
+          step: 0.01,
+          label: "Stem Height",
+        },
+        roseauStemRadiusTop: {
+          value: 0.025,
+          min: 0.005,
+          max: 0.1,
+          step: 0.001,
+          label: "Stem Radius Top",
+        },
+        roseauStemRadiusBottom: {
+          value: 0.035,
+          min: 0.01,
+          max: 0.15,
+          step: 0.001,
+          label: "Stem Radius Bottom",
+        },
+        roseauStemRadialSegments: {
+          value: 12,
+          min: 3,
+          max: 64,
+          step: 1,
+          label: "Stem Radial Segments",
+        },
+        roseauStemHeightSegments: {
+          value: 1,
+          min: 1,
+          max: 8,
+          step: 1,
+          label: "Stem Height Segments",
+        },
+        roseauCapsuleRadius: {
+          value: 0.07,
+          min: 0.03,
+          max: 0.2,
+          step: 0.005,
+          label: "Capsule Radius",
+        },
+        roseauCapsuleLength: {
+          value: 0.1,
+          min: 0,
+          max: 0.3,
+          step: 0.01,
+          label: "Capsule Length",
+        },
+        roseauCapsuleRadialSegments: {
+          value: 16,
+          min: 4,
+          max: 64,
+          step: 1,
+          label: "Capsule Radial Segments",
+        },
+        roseauCapsuleCapSegments: {
+          value: 8,
+          min: 2,
+          max: 32,
+          step: 1,
+          label: "Capsule Cap Segments",
+        },
+        roseauVerticalSpacing: {
+          value: 0.0,
+          min: 0,
+          max: 0.1,
+          step: 0.005,
+          label: "Stem to Capsule Gap",
+        },
+        roseauStemColor: {
+          value: "#4c7a2e",
+          label: "Stem Color",
+        },
+        roseauCapsuleColor: {
+          value: "#7d4f2c",
+          label: "Capsule Color",
+        },
+        roseauWindEnabled: {
+          value: true,
+          label: "Wind Enabled",
+        },
+        roseauWindStrength: {
+          value: 0.12,
+          min: 0,
+          max: 0.5,
+          step: 0.01,
+          label: "Wind Strength",
+        },
+        roseauWindSpeed: {
+          value: 1.4,
+          min: 0,
+          max: 5,
+          step: 0.1,
+          label: "Wind Speed",
+        },
+        roseauWindGustStrength: {
+          value: 0.04,
+          min: 0,
+          max: 0.3,
+          step: 0.005,
+          label: "Gust Strength",
+        },
+        roseauWindGustFrequency: {
+          value: 0.6,
+          min: 0,
+          max: 3,
+          step: 0.05,
+          label: "Gust Frequency",
+        },
+        roseauWindStiffness: {
+          value: 1.5,
+          min: 0.2,
+          max: 4,
+          step: 0.1,
+          label: "Stiffness",
+        },
+        roseauWindLean: {
+          value: 0,
+          min: -0.3,
+          max: 0.3,
+          step: 0.01,
+          label: "Static Lean",
+        },
+        roseauWindDirectionX: {
+          value: 1,
+          min: -1,
+          max: 1,
+          step: 0.05,
+          label: "Wind Dir X",
+        },
+        roseauWindDirectionZ: {
+          value: 0.2,
+          min: -1,
+          max: 1,
+          step: 0.05,
+          label: "Wind Dir Z",
         },
       },
       { collapsed: true }
@@ -1307,6 +1501,32 @@ export const Map1 = ({
           terrainHeight={typhaTerrainHeight}
           terrainOffset={typhaTerrainOffset}
           terrainSize={typhaTerrainSize}
+        />
+      )}
+
+      {roseauEnabled && (
+        <Roseau
+          position={[roseauPositionX, roseauPositionY, roseauPositionZ]}
+          stemHeight={roseauStemHeight}
+          stemRadiusTop={roseauStemRadiusTop}
+          stemRadiusBottom={roseauStemRadiusBottom}
+          stemRadialSegments={roseauStemRadialSegments}
+          stemHeightSegments={roseauStemHeightSegments}
+          capsuleRadius={roseauCapsuleRadius}
+          capsuleLength={roseauCapsuleLength}
+          capsuleRadialSegments={roseauCapsuleRadialSegments}
+          capsuleCapSegments={roseauCapsuleCapSegments}
+          verticalSpacing={roseauVerticalSpacing}
+          colorStem={roseauStemColor}
+          colorCapsule={roseauCapsuleColor}
+          windEnabled={roseauWindEnabled}
+          windStrength={roseauWindStrength}
+          windSpeed={roseauWindSpeed}
+          windGustStrength={roseauWindGustStrength}
+          windGustFrequency={roseauWindGustFrequency}
+          windStiffness={roseauWindStiffness}
+          windDirection={[roseauWindDirectionX, roseauWindDirectionZ]}
+          staticLean={roseauWindLean}
         />
       )}
 
