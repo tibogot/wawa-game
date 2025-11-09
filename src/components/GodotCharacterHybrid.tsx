@@ -125,6 +125,8 @@ export const GodotCharacterHybrid = ({
   const jumpPhase = useRef<"none" | "start" | "loop" | "land">("none");
   const [combatMode, setCombatMode] = useState(false);
   const isAttacking = useRef(false);
+  const isRolling = useRef(false);
+  const rollPressed = useRef(false);
 
   const characterRotationTarget = useRef(0);
   const rotationTarget = useRef(0);
@@ -521,6 +523,7 @@ export const GodotCharacterHybrid = ({
 
       // Get other input states
       const danceInput = get().dance;
+      const rollInput = get().roll;
 
       // Handle crouch input and update capsule state FIRST
       // FORCED CROUCH WITH DELAY: Only delay when auto-standing from forced crouch
@@ -581,12 +584,42 @@ export const GodotCharacterHybrid = ({
         }, 300);
       }
 
+      // Handle roll input (Alt key) - only when grounded, not crouched, not dancing/attacking
+      if (
+        rollInput &&
+        !rollPressed.current &&
+        grounded &&
+        !shouldBeCrouched &&
+        !danceInput &&
+        !isAttacking.current &&
+        !isRolling.current
+      ) {
+        rollPressed.current = true;
+        isRolling.current = true;
+        jumpPhase.current = "none";
+        setAnimation("roll");
+
+        // Give a slight forward impulse in the current facing direction
+        const rollSpeed = RUN_SPEED * 1.2;
+        const facingRotation =
+          rotationTarget.current + characterRotationTarget.current;
+        vel.x = Math.sin(facingRotation) * rollSpeed;
+        vel.z = Math.cos(facingRotation) * rollSpeed;
+
+        setTimeout(() => {
+          isRolling.current = false;
+        }, 800);
+      } else if (!rollInput) {
+        rollPressed.current = false;
+      }
+
       // If in air and not in jump phase, set to loop (unless crouching or transitioning)
       if (
         !grounded &&
         jumpPhase.current === "none" &&
         !shouldBeCrouched &&
-        !crouchTransitioningRef.current
+        !crouchTransitioningRef.current &&
+        !isRolling.current
       ) {
         jumpPhase.current = "loop";
         setAnimation("jumpLoop");
@@ -725,7 +758,8 @@ export const GodotCharacterHybrid = ({
           grounded &&
           jumpPhase.current === "none" &&
           !danceInput &&
-          !isAttacking.current
+          !isAttacking.current &&
+          !isRolling.current
         ) {
           if (shouldBeCrouched) {
             setAnimation("crouchWalk");
@@ -775,7 +809,8 @@ export const GodotCharacterHybrid = ({
           grounded &&
           jumpPhase.current === "none" &&
           !danceInput &&
-          !isAttacking.current
+          !isAttacking.current &&
+          !isRolling.current
         ) {
           if (shouldBeCrouched) {
             setAnimation("crouchIdle");

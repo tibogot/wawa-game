@@ -84,6 +84,7 @@ export function GodotCharacter({ animation, ...props }: GodotCharacterProps) {
     swordIdle: "Sword_Idle",
     swordAttack: "Sword_Attack",
     swordAttackAlt: "Sword_Attack_RM",
+    roll: "Roll",
   };
 
   const currentAnimationRef = useRef<string | null>(null);

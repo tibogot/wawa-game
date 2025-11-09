@@ -16,6 +16,7 @@ const keyboardMap = [
   { name: "crouch", keys: ["ControlLeft", "ControlRight"] },
   { name: "dance", keys: ["KeyE"] },
   { name: "walkBackward", keys: ["KeyQ"] },
+  { name: "roll", keys: ["KeyF"] },
 ];
 
 function App() {
