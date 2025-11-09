@@ -110,6 +110,7 @@ export const Experience = () => {
   ]);
   const [deerSpawnPosition, setDeerSpawnPosition] = useState([5, 1, 5]);
   const [isTerrainReady, setIsTerrainReady] = useState(false); // Track terrain readiness
+  const [teleportRequest, setTeleportRequest] = useState(null);
 
   // Debug: Log when isTerrainReady changes
   useEffect(() => {
@@ -216,6 +217,19 @@ export const Experience = () => {
     }, 200); // Additional delay to ensure physics colliders are fully ready
   }, []);
 
+  const handleTeleportRequest = useCallback((request) => {
+    setTeleportRequest(request);
+  }, []);
+
+  const handleTeleportHandled = useCallback((id) => {
+    setTeleportRequest((current) => {
+      if (current && current.id === id) {
+        return null;
+      }
+      return current;
+    });
+  }, []);
+
   // Track previous map to detect actual changes (initialize to null for first run)
   const prevMapRef = useRef(null);
 
@@ -229,6 +243,7 @@ export const Experience = () => {
       prevMapRef.current = map;
       // Reset terrain ready state when map changes
       setIsTerrainReady(false);
+      setTeleportRequest(null);
     } else {
       console.log(
         `🔍 Map useEffect ran but map is still: ${map}, NOT resetting terrain ready`
@@ -245,7 +260,8 @@ export const Experience = () => {
       map !== "map11" &&
       map !== "map12" &&
       map !== "map13" &&
-      map !== "map15"
+      map !== "map15" &&
+      map !== "map16"
     ) {
       setIsTerrainReady(true);
     }
@@ -615,6 +631,7 @@ export const Experience = () => {
             scale={maps[map].scale}
             position={maps[map].position}
             onTerrainReady={handleTerrainReady}
+            onTeleportRequest={handleTeleportRequest}
           />
         )}
         {/* Only spawn character when terrain is ready */}
@@ -622,6 +639,8 @@ export const Experience = () => {
           <GodotCharacterHybrid
             cameraMode={cameraMode}
             position={characterSpawnPosition}
+            teleportRequest={teleportRequest}
+            onTeleportHandled={handleTeleportHandled}
             onPositionChange={(pos) => {
               characterPositionVector.current.set(pos[0], pos[1], pos[2]);
             }}

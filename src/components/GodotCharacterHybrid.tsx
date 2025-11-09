@@ -1,13 +1,14 @@
 // Hybrid approach: Rapier for physics + BVH for ground detection
 import React, { useEffect, useRef, useState } from "react";
 import { useKeyboardControls } from "@react-three/drei";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { CapsuleCollider, RigidBody, useRapier } from "@react-three/rapier";
 import { useControls, folder } from "leva";
 import { MathUtils, Vector3, Matrix4, Line3, Box3 } from "three";
 import { degToRad } from "three/src/math/MathUtils.js";
 import { GodotCharacter } from "./GodotCharacter";
 import type * as THREE from "three";
+import { TeleportationRequest } from "../types/teleportation";
 
 const normalizeAngle = (angle: number) => {
   while (angle > Math.PI) angle -= 2 * Math.PI;
@@ -37,6 +38,8 @@ interface Props {
   onPositionChange?: (position: [number, number, number]) => void;
   onVelocityChange?: (velocity: [number, number, number]) => void;
   onRotationChange?: (rotation: number) => void;
+  teleportRequest?: TeleportationRequest | null;
+  onTeleportHandled?: (id: string) => void;
 }
 
 export const GodotCharacterHybrid = ({
@@ -46,9 +49,12 @@ export const GodotCharacterHybrid = ({
   onPositionChange,
   onVelocityChange,
   onRotationChange,
+  teleportRequest,
+  onTeleportHandled,
 }: Props) => {
   // Access Rapier world for raycasting dynamic objects
   const { world, rapier } = useRapier();
+  const { camera } = useThree();
 
   const {
     WALK_SPEED,
@@ -134,6 +140,10 @@ export const GodotCharacterHybrid = ({
   const cameraPosition = useRef<any>(null);
   const cameraWorldPosition = useRef(new Vector3());
   const cameraLookAtWorldPosition = useRef(new Vector3());
+  const smoothCameraPosition = useRef(new Vector3());
+  const currentCameraPosition = useRef(new Vector3());
+  const idealCameraPosition = useRef(new Vector3());
+  const smoothLookAtPosition = useRef(new Vector3());
   const cameraLookAt = useRef(new Vector3());
   const [, get] = useKeyboardControls();
   const jumpPressed = useRef(false);
@@ -141,6 +151,11 @@ export const GodotCharacterHybrid = ({
   const isCrouchingRef = useRef(false);
   const crouchTransitioningRef = useRef(false);
   const ceilingClearanceTimer = useRef(0);
+  const teleportTimeoutRef = useRef<number | null>(null);
+  const lastTeleportIdRef = useRef<string | null>(null);
+  const teleportHoldFramesRef = useRef(0);
+  const teleportCameraPositionRef = useRef(new Vector3());
+  const teleportLookAtRef = useRef(new Vector3());
 
   // Mouse orbit for follow-orbit camera mode (delta-based)
   const mouseOrbitOffset = useRef(0); // Horizontal orbit offset (accumulated from mouse movement deltas)
@@ -326,6 +341,118 @@ export const GodotCharacterHybrid = ({
     };
   }, [cameraMode, mouseSensitivity]);
 
+  useEffect(() => {
+    if (!teleportRequest || !rb.current) {
+      return;
+    }
+
+    if (teleportRequest.id === lastTeleportIdRef.current) {
+      return;
+    }
+
+    lastTeleportIdRef.current = teleportRequest.id;
+
+    const {
+      spawnPosition,
+      cameraPosition: cameraTargetPosition,
+      lookAtPosition,
+      delayMs = 0,
+    } = teleportRequest;
+
+    const spawnVec = new Vector3(
+      spawnPosition[0],
+      spawnPosition[1],
+      spawnPosition[2]
+    );
+    const cameraVec = new Vector3(
+      cameraTargetPosition[0],
+      cameraTargetPosition[1],
+      cameraTargetPosition[2]
+    );
+    const lookAtVec = new Vector3(
+      lookAtPosition[0],
+      lookAtPosition[1],
+      lookAtPosition[2]
+    );
+
+    teleportCameraPositionRef.current.copy(cameraVec);
+    teleportLookAtRef.current.copy(lookAtVec);
+    teleportHoldFramesRef.current = Math.max(teleportHoldFramesRef.current, 12);
+
+    camera.position.copy(cameraVec);
+    camera.lookAt(lookAtVec);
+    smoothCameraPosition.current.copy(cameraVec);
+    currentCameraPosition.current.copy(cameraVec);
+    idealCameraPosition.current.copy(cameraVec);
+    smoothLookAtPosition.current.copy(lookAtVec);
+    cameraLookAt.current.copy(lookAtVec);
+    cameraInitialized.current = true;
+
+    const performTeleport = () => {
+      if (!rb.current) {
+        return;
+      }
+
+      rb.current.setTranslation(
+        { x: spawnVec.x, y: spawnVec.y, z: spawnVec.z },
+        true
+      );
+      rb.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      rb.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
+
+      teleportHoldFramesRef.current = Math.max(
+        teleportHoldFramesRef.current,
+        8
+      );
+
+      jumpPhase.current = "none";
+      setAnimation("idle");
+      setIsGrounded(true);
+      wasGrounded.current = true;
+
+      if (onPositionChange) {
+        onPositionChange([spawnVec.x, spawnVec.y, spawnVec.z]);
+      }
+
+      if (onVelocityChange) {
+        onVelocityChange([0, 0, 0]);
+      }
+
+      if (onTeleportHandled) {
+        onTeleportHandled(teleportRequest.id);
+      }
+    };
+
+    if (teleportTimeoutRef.current !== null) {
+      window.clearTimeout(teleportTimeoutRef.current);
+      teleportTimeoutRef.current = null;
+    }
+
+    if (delayMs > 0) {
+      teleportTimeoutRef.current = window.setTimeout(() => {
+        performTeleport();
+        teleportTimeoutRef.current = null;
+      }, delayMs);
+    } else {
+      performTeleport();
+    }
+
+    return () => {
+      if (teleportTimeoutRef.current !== null) {
+        window.clearTimeout(teleportTimeoutRef.current);
+        teleportTimeoutRef.current = null;
+      }
+    };
+  }, [
+    teleportRequest,
+    camera,
+    onPositionChange,
+    onVelocityChange,
+    onTeleportHandled,
+    setAnimation,
+    setIsGrounded,
+  ]);
+
   // BVH-based ground detection - checks surface normal (STATIC GEOMETRY)
   const checkGroundedBVH = () => {
     if (!rb.current || !collider || !collider.geometry.boundsTree) return false;
@@ -493,7 +620,7 @@ export const GodotCharacterHybrid = ({
     }
   };
 
-  useFrame(({ camera }, delta) => {
+  useFrame((_state, delta) => {
     if (rb.current) {
       const vel = rb.current.linvel();
       if (!vel) return;
@@ -912,6 +1039,15 @@ export const GodotCharacterHybrid = ({
       if (isFirstFrame) {
         cameraInitialized.current = true;
       }
+    }
+
+    if (teleportHoldFramesRef.current > 0) {
+      teleportHoldFramesRef.current -= 1;
+      camera.position.copy(teleportCameraPositionRef.current);
+      smoothCameraPosition.current.copy(teleportCameraPositionRef.current);
+      cameraLookAt.current.copy(teleportLookAtRef.current);
+      smoothLookAtPosition.current.copy(teleportLookAtRef.current);
+      camera.lookAt(teleportLookAtRef.current);
     }
   });
 
