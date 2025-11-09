@@ -100,7 +100,7 @@ export const Map15 = forwardRef<THREE.Mesh | null, Map15Props>(
         <ElevatorPlatform position={[0, 0, 15]} />
         <StaticPlatform position={[0, 12, 24]} size={[12, 1, 10]} />
         <StaticPlatform position={[8, 13, 24]} size={[6, 1, 6]} />
-        <StaticPlatform position={[28, 13.25, 24]} size={[40, 1, 4]} />
+        <StaticPlatform position={[28, 13.05, 24]} size={[40, 1, 4]} />
         <JumpTestingCircles
           startPosition={[28, 13.25, 24]}
           step={[0, 0, 4.5]}
