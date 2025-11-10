@@ -15,6 +15,11 @@ import { degToRad } from "three/src/math/MathUtils.js";
 import { GodotCharacter } from "./GodotCharacter";
 import type * as THREE from "three";
 import { TeleportationRequest } from "../types/teleportation";
+import {
+  FootstepParticles,
+  type FootstepParticlesHandle,
+  type FootstepParticleSpawnOptions,
+} from "./FootstepParticles";
 
 const normalizeAngle = (angle: number) => {
   while (angle > Math.PI) angle -= 2 * Math.PI;
@@ -167,6 +172,7 @@ export const GodotCharacterHybrid = ({
   const teleportCameraPositionRef = useRef(new Vector3());
   const teleportLookAtRef = useRef(new Vector3());
 
+  const footstepParticlesRef = useRef<FootstepParticlesHandle | null>(null);
   const leftFootBone = useRef<THREE.Object3D | null>(null);
   const rightFootBone = useRef<THREE.Object3D | null>(null);
   const leftFootWorldPosition = useRef(new Vector3());
@@ -180,6 +186,8 @@ export const GodotCharacterHybrid = ({
   const footstepCooldownRef = useRef(0);
   const footBonesMissingWarnedRef = useRef(false);
   const lastFootstepIndexRef = useRef<number | null>(null);
+  const tempLandingCenterRef = useRef(new Vector3());
+  const tempLandingNormalRef = useRef(new Vector3(0, 1, 0));
 
   const footstepAnimations = useMemo(
     () => new Set(["walk", "run", "walkBackwards", "crouchWalk"]),
@@ -223,9 +231,9 @@ export const GodotCharacterHybrid = ({
   }, [footstepSoundPaths]);
 
   const castFootRay = useCallback(
-    (position: THREE.Vector3) => {
+    (position: THREE.Vector3): FootstepParticleSpawnOptions | null => {
       if (!world || !rapier || !rb.current) {
-        return false;
+        return null;
       }
 
       const rayOrigin = {
@@ -238,7 +246,7 @@ export const GodotCharacterHybrid = ({
 
       try {
         const ray = new rapier.Ray(rayOrigin, rayDirection);
-        const hit = world.castRay(
+        const hit = world.castRayAndGetNormal(
           ray,
           rayLength,
           true,
@@ -249,14 +257,44 @@ export const GodotCharacterHybrid = ({
           undefined
         );
 
-        return !!(
-          hit &&
-          hit.timeOfImpact !== undefined &&
-          hit.timeOfImpact <= rayLength
-        );
+        if (hit) {
+          const hitToi =
+            (hit as any).toi ??
+            (hit as any).timeOfImpact ??
+            (hit as any).time_of_impact ??
+            null;
+
+          if (typeof hitToi === "number" && hitToi <= rayLength) {
+            const point = new Vector3(
+              rayOrigin.x + rayDirection.x * hitToi,
+              rayOrigin.y + rayDirection.y * hitToi,
+              rayOrigin.z + rayDirection.z * hitToi
+            );
+
+            const hitNormal =
+              (hit as any).normal ??
+              (hit as any).normal1 ??
+              (hit as any).normal2 ??
+              null;
+
+            let normal: THREE.Vector3;
+            if (hitNormal) {
+              normal = new Vector3(hitNormal.x, hitNormal.y, hitNormal.z);
+            } else {
+              normal = new Vector3().copy(tempLandingNormalRef.current);
+            }
+
+            return {
+              position: point,
+              normal,
+            };
+          }
+        }
+
+        return null;
       } catch (error) {
         console.warn("Footstep raycast error:", error);
-        return false;
+        return null;
       }
     },
     [rapier, world]
@@ -680,12 +718,15 @@ export const GodotCharacterHybrid = ({
         undefined // filterPredicate
       );
 
-      if (hit && hit.timeOfImpact !== undefined) {
-        // Check if hit is close to feet (not hitting something far away)
-        const hitDistance = hit.timeOfImpact;
+      if (hit) {
+        const hitToi =
+          (hit as any).toi ??
+          (hit as any).timeOfImpact ??
+          (hit as any).time_of_impact ??
+          null;
 
         // Only count as grounded if hit is within the ray length
-        if (hitDistance <= rayLength) {
+        if (typeof hitToi === "number" && hitToi <= rayLength) {
           return true;
         }
       }
@@ -833,6 +874,45 @@ export const GodotCharacterHybrid = ({
         if (footstepCooldownRef.current <= 0.05) {
           playFootstepSound();
           footstepCooldownRef.current = 0.25;
+          const landingHits: FootstepParticleSpawnOptions[] = [];
+          if (leftFootBone.current) {
+            const pos = leftFootWorldPosition.current;
+            leftFootBone.current.getWorldPosition(pos);
+            const hit = castFootRay(pos);
+            if (hit) landingHits.push(hit);
+          }
+          if (rightFootBone.current) {
+            const pos = rightFootWorldPosition.current;
+            rightFootBone.current.getWorldPosition(pos);
+            const hit = castFootRay(pos);
+            if (hit) landingHits.push(hit);
+          }
+          if (landingHits.length === 0 && character.current) {
+            const centerPos = tempLandingCenterRef.current;
+            character.current.getWorldPosition(centerPos);
+            const centerHit = castFootRay(centerPos);
+            if (centerHit) landingHits.push(centerHit);
+          }
+          if (landingHits.length === 0 && rb.current) {
+            const fallbackPos = tempLandingCenterRef.current;
+            const translation = rb.current.translation();
+            const halfHeight = isCrouchingRef.current
+              ? (capsuleHeight * 0.5) / 2
+              : capsuleHeight / 2;
+            fallbackPos.set(
+              translation.x,
+              translation.y - halfHeight - capsuleRadius,
+              translation.z
+            );
+            const fallbackNormal = tempLandingNormalRef.current.set(0, 1, 0);
+            landingHits.push({
+              position: fallbackPos.clone(),
+              normal: fallbackNormal.clone(),
+            });
+          }
+          landingHits.forEach((hit) => {
+            footstepParticlesRef.current?.spawn(hit);
+          });
         }
         setTimeout(() => {
           if (jumpPhase.current === "land") {
@@ -1123,9 +1203,9 @@ export const GodotCharacterHybrid = ({
         prevPosRef: React.MutableRefObject<THREE.Vector3>,
         initializedRef: React.MutableRefObject<boolean>,
         wasGroundedRef: React.MutableRefObject<boolean>
-      ) => {
+      ): FootstepParticleSpawnOptions | null => {
         if (!boneRef.current) {
-          return false;
+          return null;
         }
 
         boneRef.current.updateWorldMatrix(true, false);
@@ -1141,7 +1221,8 @@ export const GodotCharacterHybrid = ({
           Math.max(delta, 1e-4);
         const verticalDelta = prevPosRef.current.y - worldPosRef.current.y;
         const movingDownward = verticalVelocity < -0.05 || verticalDelta > 0.01;
-        const groundedFoot = castFootRay(worldPosRef.current);
+        const hit = castFootRay(worldPosRef.current);
+        const groundedFoot = !!hit;
 
         const triggered =
           allowFootstepChecks &&
@@ -1153,17 +1234,17 @@ export const GodotCharacterHybrid = ({
         prevPosRef.current.copy(worldPosRef.current);
         wasGroundedRef.current = groundedFoot;
 
-        return triggered;
+        return triggered ? hit : null;
       };
 
-      const leftTriggered = processFoot(
+      const leftHit = processFoot(
         leftFootBone,
         leftFootWorldPosition,
         prevLeftFootPosition,
         leftFootInitialized,
         leftFootWasGrounded
       );
-      const rightTriggered = processFoot(
+      const rightHit = processFoot(
         rightFootBone,
         rightFootWorldPosition,
         prevRightFootPosition,
@@ -1171,9 +1252,20 @@ export const GodotCharacterHybrid = ({
         rightFootWasGrounded
       );
 
-      if (leftTriggered || rightTriggered) {
+      const hitsToProcess: FootstepParticleSpawnOptions[] = [];
+      if (leftHit) {
+        hitsToProcess.push(leftHit);
+      }
+      if (rightHit) {
+        hitsToProcess.push(rightHit);
+      }
+
+      if (hitsToProcess.length > 0) {
         playFootstepSound();
         footstepCooldownRef.current = 0.2;
+        hitsToProcess.forEach((hit) => {
+          footstepParticlesRef.current?.spawn(hit);
+        });
       }
 
       rb.current.setLinvel(vel, true);
@@ -1253,42 +1345,45 @@ export const GodotCharacterHybrid = ({
   });
 
   return (
-    <RigidBody
-      colliders={false}
-      ref={rb}
-      position={position}
-      gravityScale={1}
-      enabledRotations={[false, false, false]}
-      type="dynamic"
-      ccd={true}
-    >
-      <group ref={container}>
-        <group ref={cameraTarget} position-z={targetZ} />
-        <group ref={cameraPosition} position={[cameraX, cameraY, cameraZ]} />
-        <group
-          ref={character}
-          position-y={
-            isCrouchingRef.current
-              ? capsuleHeight / 2 - (capsuleHeight * 0.5) / 2
-              : 0
-          }
-        >
-          <GodotCharacter
-            animation={animation}
-            onFootBonesReady={handleFootBonesReady}
-          />
+    <>
+      <RigidBody
+        colliders={false}
+        ref={rb}
+        position={position}
+        gravityScale={1}
+        enabledRotations={[false, false, false]}
+        type="dynamic"
+        ccd={true}
+      >
+        <group ref={container}>
+          <group ref={cameraTarget} position-z={targetZ} />
+          <group ref={cameraPosition} position={[cameraX, cameraY, cameraZ]} />
+          <group
+            ref={character}
+            position-y={
+              isCrouchingRef.current
+                ? capsuleHeight / 2 - (capsuleHeight * 0.5) / 2
+                : 0
+            }
+          >
+            <GodotCharacter
+              animation={animation}
+              onFootBonesReady={handleFootBonesReady}
+            />
+          </group>
         </group>
-      </group>
-      <CapsuleCollider
-        args={[
-          isCrouchingRef.current
-            ? (capsuleHeight * 0.5) / 2
-            : capsuleHeight / 2,
-          capsuleRadius,
-        ]}
-        friction={0.5}
-        restitution={0}
-      />
-    </RigidBody>
+        <CapsuleCollider
+          args={[
+            isCrouchingRef.current
+              ? (capsuleHeight * 0.5) / 2
+              : capsuleHeight / 2,
+            capsuleRadius,
+          ]}
+          friction={0.5}
+          restitution={0}
+        />
+      </RigidBody>
+      <FootstepParticles ref={footstepParticlesRef} />
+    </>
   );
 };
