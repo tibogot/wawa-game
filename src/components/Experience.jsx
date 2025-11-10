@@ -25,6 +25,8 @@ import { Map13 } from "./Map13";
 import { Map14 } from "./Map14";
 import { Map15 } from "./Map15";
 import { Map16 } from "./Map16";
+import { Map17 } from "./Map17";
+import { Map18 } from "./Map18";
 import { DeerController } from "./DeerController";
 import { DeerHerd } from "./DeerHerd";
 import { useLightsControls } from "./useLightsControls";
@@ -97,6 +99,14 @@ const maps = {
     position: [0, 0, 0],
   },
   map16: {
+    scale: 1,
+    position: [0, 0, 0],
+  },
+  map17: {
+    scale: 1,
+    position: [0, 0, 0],
+  },
+  map18: {
     scale: 1,
     position: [0, 0, 0],
   },
@@ -261,7 +271,9 @@ export const Experience = () => {
       map !== "map12" &&
       map !== "map13" &&
       map !== "map15" &&
-      map !== "map16"
+      map !== "map16" &&
+      map !== "map17" &&
+      map !== "map18"
     ) {
       setIsTerrainReady(true);
     }
@@ -373,6 +385,20 @@ export const Experience = () => {
       // For Map16 (TileMaterial floor only), keep character near origin
       const characterPos = [0, 2, 0];
       const deerPos = [5, 2, 5];
+
+      setCharacterSpawnPosition(characterPos);
+      setDeerSpawnPosition(deerPos);
+    } else if (map === "map17") {
+      // For Map17 (TileMaterial floor only), keep character near origin
+      const characterPos = [0, 2, 0];
+      const deerPos = [5, 2, 5];
+
+      setCharacterSpawnPosition(characterPos);
+      setDeerSpawnPosition(deerPos);
+    } else if (map === "map18") {
+      // For Map18 (Procedural terrain), spawn slightly above ground until terrain loads
+      const characterPos = [0, 120, 0];
+      const deerPos = [15, 120, -10];
 
       setCharacterSpawnPosition(characterPos);
       setDeerSpawnPosition(deerPos);
@@ -624,6 +650,30 @@ export const Experience = () => {
             scale={maps[map].scale}
             position={maps[map].position}
             onTerrainReady={handleTerrainReady}
+          />
+        ) : map === "map16" ? (
+          <Map16
+            ref={terrainMeshRef}
+            scale={maps[map].scale}
+            position={maps[map].position}
+            onTerrainReady={handleTerrainReady}
+            onTeleportRequest={handleTeleportRequest}
+          />
+        ) : map === "map17" ? (
+          <Map17
+            ref={terrainMeshRef}
+            scale={maps[map].scale}
+            position={maps[map].position}
+            onTerrainReady={handleTerrainReady}
+            onTeleportRequest={handleTeleportRequest}
+          />
+        ) : map === "map18" ? (
+          <Map18
+            ref={terrainMeshRef}
+            scale={maps[map].scale}
+            position={maps[map].position}
+            onTerrainReady={handleTerrainReady}
+            onTeleportRequest={handleTeleportRequest}
           />
         ) : (
           <Map16
