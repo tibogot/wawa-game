@@ -80,6 +80,8 @@ export const GodotCharacterHybrid = ({
     mouseSensitivity,
     capsuleHeight,
     capsuleRadius,
+    enableFootstepAudio,
+    enableFootstepParticles,
   } = useControls("🎮 GODOT CHARACTER", {
     control: folder(
       {
@@ -127,6 +129,19 @@ export const GodotCharacterHybrid = ({
           max: 0.3,
           step: 0.01,
           label: "Capsule Radius",
+        },
+      },
+      { collapsed: true }
+    ),
+    footsteps: folder(
+      {
+        enableFootstepAudio: {
+          value: true,
+          label: "Enable Footstep Audio",
+        },
+        enableFootstepParticles: {
+          value: true,
+          label: "Enable Footstep Particles",
         },
       },
       { collapsed: true }
@@ -207,7 +222,11 @@ export const GodotCharacterHybrid = ({
   );
 
   const playFootstepSound = useCallback(() => {
-    if (typeof window === "undefined" || footstepSoundPaths.length === 0) {
+    if (
+      !enableFootstepAudio ||
+      typeof window === "undefined" ||
+      footstepSoundPaths.length === 0
+    ) {
       return;
     }
 
@@ -923,9 +942,11 @@ export const GodotCharacterHybrid = ({
               hitToi: 0,
             });
           }
-          landingHits.forEach((hit) => {
-            footstepParticlesRef.current?.spawn(hit);
-          });
+          if (enableFootstepParticles) {
+            landingHits.forEach((hit) => {
+              footstepParticlesRef.current?.spawn(hit);
+            });
+          }
         }
         setTimeout(() => {
           if (jumpPhase.current === "land") {
@@ -1296,11 +1317,15 @@ export const GodotCharacterHybrid = ({
       }
 
       if (hitsToProcess.length > 0) {
-        playFootstepSound();
+        if (enableFootstepAudio) {
+          playFootstepSound();
+        }
         footstepCooldownRef.current = 0.2;
-        hitsToProcess.forEach((hit) => {
-          footstepParticlesRef.current?.spawn(hit);
-        });
+        if (enableFootstepParticles) {
+          hitsToProcess.forEach((hit) => {
+            footstepParticlesRef.current?.spawn(hit);
+          });
+        }
       }
 
       rb.current.setLinvel(vel, true);
@@ -1418,7 +1443,9 @@ export const GodotCharacterHybrid = ({
           restitution={0}
         />
       </RigidBody>
-      <FootstepParticles ref={footstepParticlesRef} />
+      {enableFootstepParticles && (
+        <FootstepParticles ref={footstepParticlesRef} />
+      )}
     </>
   );
 };
