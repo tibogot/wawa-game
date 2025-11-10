@@ -188,6 +188,8 @@ export const GodotCharacterHybrid = ({
   const lastFootstepIndexRef = useRef<number | null>(null);
   const tempLandingCenterRef = useRef(new Vector3());
   const tempLandingNormalRef = useRef(new Vector3(0, 1, 0));
+  const leftFootPrevToi = useRef(1);
+  const rightFootPrevToi = useRef(1);
 
   const footstepAnimations = useMemo(
     () => new Set(["walk", "run", "walkBackwards", "crouchWalk"]),
@@ -231,7 +233,9 @@ export const GodotCharacterHybrid = ({
   }, [footstepSoundPaths]);
 
   const castFootRay = useCallback(
-    (position: THREE.Vector3): FootstepParticleSpawnOptions | null => {
+    (
+      position: THREE.Vector3
+    ): (FootstepParticleSpawnOptions & { hitToi: number }) | null => {
       if (!world || !rapier || !rb.current) {
         return null;
       }
@@ -284,9 +288,15 @@ export const GodotCharacterHybrid = ({
               normal = new Vector3().copy(tempLandingNormalRef.current);
             }
 
+            const slopeFactor = normal
+              ? 1 - Math.max(0, Math.min(1, normal.y))
+              : 0;
+
             return {
               position: point,
               normal,
+              slopeFactor,
+              hitToi,
             };
           }
         }
@@ -874,7 +884,9 @@ export const GodotCharacterHybrid = ({
         if (footstepCooldownRef.current <= 0.05) {
           playFootstepSound();
           footstepCooldownRef.current = 0.25;
-          const landingHits: FootstepParticleSpawnOptions[] = [];
+          const landingHits: Array<
+            FootstepParticleSpawnOptions & { hitToi?: number }
+          > = [];
           if (leftFootBone.current) {
             const pos = leftFootWorldPosition.current;
             leftFootBone.current.getWorldPosition(pos);
@@ -908,6 +920,7 @@ export const GodotCharacterHybrid = ({
             landingHits.push({
               position: fallbackPos.clone(),
               normal: fallbackNormal.clone(),
+              hitToi: 0,
             });
           }
           landingHits.forEach((hit) => {
@@ -1202,8 +1215,9 @@ export const GodotCharacterHybrid = ({
         worldPosRef: React.MutableRefObject<THREE.Vector3>,
         prevPosRef: React.MutableRefObject<THREE.Vector3>,
         initializedRef: React.MutableRefObject<boolean>,
-        wasGroundedRef: React.MutableRefObject<boolean>
-      ): FootstepParticleSpawnOptions | null => {
+        wasGroundedRef: React.MutableRefObject<boolean>,
+        prevToiRef: React.MutableRefObject<number>
+      ): (FootstepParticleSpawnOptions & { hitToi?: number }) | null => {
         if (!boneRef.current) {
           return null;
         }
@@ -1220,19 +1234,36 @@ export const GodotCharacterHybrid = ({
           (worldPosRef.current.y - prevPosRef.current.y) /
           Math.max(delta, 1e-4);
         const verticalDelta = prevPosRef.current.y - worldPosRef.current.y;
-        const movingDownward = verticalVelocity < -0.05 || verticalDelta > 0.01;
+        const movementDelta = Math.sqrt(
+          Math.pow(worldPosRef.current.x - prevPosRef.current.x, 2) +
+            Math.pow(worldPosRef.current.z - prevPosRef.current.z, 2)
+        );
+
         const hit = castFootRay(worldPosRef.current);
-        const groundedFoot = !!hit;
+        const hitToi = hit?.hitToi ?? null;
+        const slopeFactor = hit?.slopeFactor ?? 0;
+
+        const groundedFoot =
+          typeof hitToi === "number" &&
+          hitToi < (slopeFactor > 0.4 ? 0.28 : 0.23);
 
         const triggered =
           allowFootstepChecks &&
           groundedFoot &&
-          !wasGroundedRef.current &&
-          movingDownward &&
-          footstepCooldownRef.current <= 0;
+          footstepCooldownRef.current <= 0 &&
+          ((!wasGroundedRef.current &&
+            (verticalVelocity < -0.02 ||
+              verticalDelta > 0.006 ||
+              slopeFactor > 0.35)) ||
+            (typeof hitToi === "number" &&
+              prevToiRef.current - hitToi >
+                (slopeFactor > 0.2 ? 0.025 : 0.05) &&
+              movementDelta > 0.01));
 
         prevPosRef.current.copy(worldPosRef.current);
         wasGroundedRef.current = groundedFoot;
+        prevToiRef.current =
+          groundedFoot && typeof hitToi === "number" ? hitToi : 1;
 
         return triggered ? hit : null;
       };
@@ -1242,17 +1273,21 @@ export const GodotCharacterHybrid = ({
         leftFootWorldPosition,
         prevLeftFootPosition,
         leftFootInitialized,
-        leftFootWasGrounded
+        leftFootWasGrounded,
+        leftFootPrevToi
       );
       const rightHit = processFoot(
         rightFootBone,
         rightFootWorldPosition,
         prevRightFootPosition,
         rightFootInitialized,
-        rightFootWasGrounded
+        rightFootWasGrounded,
+        rightFootPrevToi
       );
 
-      const hitsToProcess: FootstepParticleSpawnOptions[] = [];
+      const hitsToProcess: Array<
+        FootstepParticleSpawnOptions & { hitToi?: number }
+      > = [];
       if (leftHit) {
         hitsToProcess.push(leftHit);
       }
